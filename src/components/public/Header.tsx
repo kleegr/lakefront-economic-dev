@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { label: 'Jobs', href: '/jobs' },
   { label: 'Businesses', href: '/businesses' },
   { label: 'Services', href: '/services' },
-  { label: 'Spaces', href: '/commercial' },
+  { label: 'Spaces', href: '/spaces' },
   { label: 'Investors', href: '/investors' },
   { label: 'Contact', href: '/contact' },
 ];
