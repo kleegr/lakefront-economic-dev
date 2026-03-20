@@ -20,8 +20,8 @@
   .card-portal { @apply bg-portal-card rounded-xl border border-gray-200 shadow-sm; }
   .input-field { @apply w-full px-4 py-3 border border-gray-300 rounded-sm font-body text-brand-text placeholder:text-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-sage/30 focus:border-brand-sage; }
   .input-portal { @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-lg font-body text-sm text-brand-text placeholder:text-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-portal-accent/30 focus:border-portal-accent; }
-  /* Sub-page hero: 160px top padding = ribbon(32) + header(70) + gap(58) */
-  .gradient-forest { @apply bg-brand-forest; padding-top: 160px; }
+  /* Sub-page hero: 200px top padding = ribbon(32) + header(70) + logo-clearance(98) */
+  .gradient-forest { @apply bg-brand-forest; padding-top: 200px; }
   .text-gradient { @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-forest to-brand-sage; }
 }
 
