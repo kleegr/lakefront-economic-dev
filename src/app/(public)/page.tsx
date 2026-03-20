@@ -5,12 +5,13 @@ import { Briefcase, Building2, Store, TrendingUp, MapPin, ArrowRight, ShieldChec
 import { mockJobs, mockSpaces, businessOpportunities, serviceOpportunities } from '@/lib/mock-data';
 import { formatSalary, formatEnum } from '@/lib/utils';
 
+// 5 images — NO PEOPLE, only buildings/architecture/landscapes
 const HERO_IMAGES = [
   'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80',
-  'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80',
-  'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1920&q=80',
-  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1920&q=80',
-  'https://images.unsplash.com/photo-1497215842964-222b430dc094?w=1920&q=80',
+  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1920&q=80',
+  'https://images.unsplash.com/photo-1464938050520-ef2571e0d6e0?w=1920&q=80',
+  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1920&q=80',
+  'https://images.unsplash.com/photo-1448630360428-65456659e233?w=1920&q=80',
 ];
 
 function HeroBanner() {
@@ -20,11 +21,23 @@ function HeroBanner() {
     return () => clearInterval(timer);
   }, []);
   return (
-    <div className="absolute inset-0">
+    <>
       {HERO_IMAGES.map((img, i) => (
-        <div key={i} className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[2000ms] ${i === current ? 'opacity-30' : 'opacity-0'}`} style={{ backgroundImage: `url(${img})` }} />
+        <div
+          key={i}
+          className={`absolute inset-0 transition-opacity duration-[3000ms] ease-in-out ${i === current ? 'opacity-30' : 'opacity-0'}`}
+        >
+          {/* Each image slowly pans using CSS animation */}
+          <div
+            className="absolute inset-[-10%] bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${img})`,
+              animation: `panImage${i % 3} 30s ease-in-out infinite`,
+            }}
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -32,8 +45,14 @@ export default function HomePage() {
   const featuredJobs = mockJobs.slice(0, 3);
   const availableBiz = businessOpportunities.filter(b => b.status === 'available').length;
   const neededSvc = serviceOpportunities.filter(s => s.status === 'needed' || s.status === 'partial').length;
+  const [heroIdx, setHeroIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setHeroIdx(p => (p + 1) % 5), 15000);
+    return () => clearInterval(t);
+  }, []);
+
   return (<>
-    {/* HERO with rotating images */}
+    {/* HERO with moving panning background */}
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-brand-forest" />
       <HeroBanner />
@@ -46,8 +65,10 @@ export default function HomePage() {
           <Link href="/about" className="inline-flex items-center justify-center px-8 py-3.5 border border-white/20 text-white font-body font-medium text-sm tracking-wider uppercase rounded-sm transition-all duration-300 hover:bg-white/10 hover:border-white/40">About Us</Link>
           <Link href="/apply" className="btn-primary">Apply Now</Link>
         </div>
-        {/* Image indicator dots */}
-        <div className="flex justify-center gap-2 mt-12"><HeroDots /></div>
+        {/* Dots */}
+        <div className="flex justify-center gap-2 mt-12">
+          {[0,1,2,3,4].map(i => (<span key={i} className={`h-2 rounded-full transition-all duration-700 ${i === heroIdx ? 'bg-brand-gold w-8' : 'bg-white/30 w-2'}`} />))}
+        </div>
       </div>
     </section>
 
@@ -63,7 +84,7 @@ export default function HomePage() {
       </div>
     </div></section>
 
-    {/* ABOUT — modern office building */}
+    {/* ABOUT — modern office building, NO people */}
     <section className="py-20 lg:py-28 bg-white">
       <div className="max-container section-padding"><div className="grid lg:grid-cols-2 gap-16 items-center">
         <div>
@@ -73,7 +94,10 @@ export default function HomePage() {
           <p className="text-base text-brand-text/60 font-body leading-relaxed mb-8">Less than an hour and a half from Boca, Palm Beach, and Orlando, the Lakefront Economy offers unique opportunities for entrepreneurs, service providers, and investors.</p>
           <Link href="/about" className="btn-primary text-xs">Learn More <ArrowRight className="w-4 h-4 ml-2" /></Link>
         </div>
-        <div className="relative rounded-sm overflow-hidden"><img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80" alt="Modern office building" className="w-full h-80 lg:h-96 object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-brand-forest/30 to-transparent" /></div>
+        <div className="relative rounded-sm overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80" alt="Modern office building" className="w-full h-80 lg:h-96 object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-forest/30 to-transparent" />
+        </div>
       </div></div>
     </section>
 
@@ -129,14 +153,4 @@ export default function HomePage() {
     {/* CTA */}
     <section className="relative py-24 overflow-hidden"><div className="absolute inset-0 bg-brand-cream" /><div className="relative max-container section-padding text-center"><h2 className="font-display text-3xl lg:text-4xl font-bold text-brand-forest mb-4">Join the Lakefront Economy</h2><p className="text-base text-brand-muted font-body mb-8 max-w-md mx-auto">Whether you&apos;re a job seeker, entrepreneur, service provider, or investor &mdash; there&apos;s a place for you.</p><div className="flex flex-wrap justify-center gap-4"><Link href="/apply" className="btn-primary">Apply Now</Link><Link href="/investors" className="btn-secondary text-xs">Invest in Lakefront Economy</Link></div></div></section>
   </>);
-}
-
-function HeroDots() {
-  'use client';
-  const [current, setCurrent] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setCurrent(prev => (prev + 1) % 5), 15000);
-    return () => clearInterval(timer);
-  }, []);
-  return (<>{[0,1,2,3,4].map(i => (<span key={i} className={`w-2 h-2 rounded-full transition-all duration-500 ${i === current ? 'bg-brand-gold w-6' : 'bg-white/30'}`} />))}</>);
 }
