@@ -5,13 +5,13 @@ import { Briefcase, Building2, Store, TrendingUp, MapPin, ArrowRight, ShieldChec
 import { mockJobs, mockSpaces, businessOpportunities, serviceOpportunities } from '@/lib/mock-data';
 import { formatSalary, formatEnum } from '@/lib/utils';
 
-// 5 images — NO PEOPLE, only buildings/architecture/landscapes
+// Luxury high-class professional business images — NO PEOPLE
 const HERO_IMAGES = [
-  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80',
-  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1920&q=80',
-  'https://images.unsplash.com/photo-1464938050520-ef2571e0d6e0?w=1920&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1920&q=80',
-  'https://images.unsplash.com/photo-1448630360428-65456659e233?w=1920&q=80',
+  'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80', // modern luxury office lobby
+  'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1920&q=80', // executive boardroom glass
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80', // glass skyscraper looking up
+  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1920&q=80', // modern corporate campus
+  'https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=1920&q=80', // luxury office building exterior
 ];
 
 function HeroBanner() {
@@ -27,7 +27,6 @@ function HeroBanner() {
           key={i}
           className={`absolute inset-0 transition-opacity duration-[3000ms] ease-in-out ${i === current ? 'opacity-30' : 'opacity-0'}`}
         >
-          {/* Each image slowly pans using CSS animation */}
           <div
             className="absolute inset-[-10%] bg-cover bg-center"
             style={{
@@ -65,7 +64,6 @@ export default function HomePage() {
           <Link href="/about" className="inline-flex items-center justify-center px-8 py-3.5 border border-white/20 text-white font-body font-medium text-sm tracking-wider uppercase rounded-sm transition-all duration-300 hover:bg-white/10 hover:border-white/40">About Us</Link>
           <Link href="/apply" className="btn-primary">Apply Now</Link>
         </div>
-        {/* Dots */}
         <div className="flex justify-center gap-2 mt-12">
           {[0,1,2,3,4].map(i => (<span key={i} className={`h-2 rounded-full transition-all duration-700 ${i === heroIdx ? 'bg-brand-gold w-8' : 'bg-white/30 w-2'}`} />))}
         </div>
@@ -84,7 +82,7 @@ export default function HomePage() {
       </div>
     </div></section>
 
-    {/* ABOUT — modern office building, NO people */}
+    {/* ABOUT */}
     <section className="py-20 lg:py-28 bg-white">
       <div className="max-container section-padding"><div className="grid lg:grid-cols-2 gap-16 items-center">
         <div>
@@ -95,7 +93,7 @@ export default function HomePage() {
           <Link href="/about" className="btn-primary text-xs">Learn More <ArrowRight className="w-4 h-4 ml-2" /></Link>
         </div>
         <div className="relative rounded-sm overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80" alt="Modern office building" className="w-full h-80 lg:h-96 object-cover" />
+          <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80" alt="Luxury modern office interior" className="w-full h-80 lg:h-96 object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-brand-forest/30 to-transparent" />
         </div>
       </div></div>
@@ -142,7 +140,7 @@ export default function HomePage() {
 
     {/* SPACES */}
     <section className="py-20 lg:py-28 bg-brand-forest relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80')] bg-cover bg-center opacity-10" />
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80')] bg-cover bg-center opacity-10" />
       <div className="relative max-container section-padding">
         <div className="text-center mb-14"><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-3">Lakefront Economy</p><h2 className="font-display text-3xl lg:text-4xl font-bold text-white">Available Spaces</h2></div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">{mockSpaces.map(space => (<div key={space.id} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-sm p-6 hover:bg-white/10 transition-all duration-300"><div className="flex items-center justify-between mb-4"><span className="px-2 py-0.5 bg-brand-gold/20 text-brand-gold text-[11px] font-body font-semibold rounded-sm uppercase">{space.type}</span></div><h3 className="font-display text-base font-semibold text-white mb-2">{space.name}</h3><p className="text-sm text-white/40 font-body mb-4 line-clamp-2">{space.description}</p><div className="flex items-center justify-between pt-4 border-t border-white/10"><span className="text-sm font-body text-white/50">{space.sqft.toLocaleString()} sqft</span>{space.monthlyRate && <span className="text-sm font-body font-semibold text-brand-gold">${space.monthlyRate.toLocaleString()}/mo</span>}</div></div>))}</div>
