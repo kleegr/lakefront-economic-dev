@@ -7,7 +7,7 @@ import { formatSalary, formatEnum, timeAgo, cn } from '@/lib/utils';
 import type { JobType, WorkMode } from '@/types';
 const JOB_TYPES: JobType[] = ['full-time','part-time','contract','seasonal','internship'];
 const WORK_MODES: WorkMode[] = ['on-site','remote','hybrid'];
-const CATEGORIES = [...new Set(mockJobs.map(j => j.category))];
+const CATEGORIES = Array.from(new Set(mockJobs.map(j => j.category)));
 export default function JobsPage() {
   const [query, setQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('');
