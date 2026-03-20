@@ -23,8 +23,8 @@ export function PublicHeader() {
 
   return (
     <>
-      {/* Top ribbon bar */}
-      <div className={cn('fixed top-0 left-0 right-0 z-[60] transition-all duration-500', scrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-9 opacity-100')}>
+      {/* Top ribbon */}
+      <div className={cn('fixed top-0 left-0 right-0 z-[60] transition-all duration-500', scrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-8 opacity-100')}>
         <div className="h-full bg-brand-dark flex items-center justify-between max-container section-padding">
           <div className="flex items-center gap-4">
             <a href="tel:+18633339400" className="text-[11px] text-white/50 font-body hover:text-brand-gold transition-colors">863.333.9400</a>
@@ -36,22 +36,13 @@ export function PublicHeader() {
       </div>
 
       {/* Main header */}
-      <header className={cn(
-        'fixed left-0 right-0 z-50 transition-all duration-500',
-        scrolled ? 'top-0 bg-white shadow-lg' : 'top-9 bg-brand-forest'
-      )}>
+      <header className={cn('fixed left-0 right-0 z-50 transition-all duration-500', scrolled ? 'top-0 bg-white shadow-lg' : 'top-8 bg-brand-forest')}>
         <div className="max-container section-padding">
-          <div className="flex items-center justify-between h-[88px]">
-            {/* Logo — taller to show ESTATES & VILLAS subtitle */}
-            <Link href="/" className="shrink-0">
-              <img
-                src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-dark-no-icon-large-no-bg-scaled.png"
-                alt="Lakefront Estates & Villas"
-                className={cn(
-                  'h-16 w-auto transition-all duration-500',
-                  scrolled ? '' : 'brightness-0 invert'
-                )}
-              />
+          <div className="flex items-center justify-between h-[70px]">
+            {/* Logo — text-based to avoid image sizing issues */}
+            <Link href="/" className="shrink-0 flex flex-col">
+              <span className={cn('font-display text-[26px] font-bold leading-none tracking-tight transition-colors duration-500', scrolled ? 'text-brand-forest' : 'text-white')}>Lakefront</span>
+              <span className={cn('text-[9px] font-body font-semibold tracking-[0.2em] uppercase mt-0.5 transition-colors duration-500', scrolled ? 'text-brand-gold' : 'text-brand-gold/80')}>Estates & Villas</span>
             </Link>
 
             {/* Desktop Nav */}
@@ -70,7 +61,6 @@ export function PublicHeader() {
               ))}
             </nav>
 
-            {/* CTA + Mobile */}
             <div className="flex items-center gap-3">
               <Link href="/apply" className="hidden xl:inline-flex items-center justify-center px-6 py-2.5 bg-brand-gold text-white font-body font-semibold text-[11px] tracking-[0.2em] uppercase rounded-sm transition-all duration-300 hover:bg-brand-gold/90 hover:shadow-lg">Application</Link>
               <button onClick={() => setMobileOpen(!mobileOpen)} className={cn('xl:hidden p-2', scrolled ? 'text-brand-forest' : 'text-white')} aria-label="Toggle navigation">
@@ -79,8 +69,6 @@ export function PublicHeader() {
             </div>
           </div>
         </div>
-
-        {/* Mobile menu */}
         {mobileOpen && (
           <div className="xl:hidden bg-white border-t border-gray-100 shadow-lg animate-fade-in">
             <nav className="section-padding py-4 space-y-1">
