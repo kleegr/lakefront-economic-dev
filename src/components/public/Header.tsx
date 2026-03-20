@@ -39,10 +39,13 @@ export function PublicHeader() {
       <header className={cn('fixed left-0 right-0 z-50 transition-all duration-500', scrolled ? 'top-0 bg-white shadow-lg' : 'top-8 bg-brand-forest')}>
         <div className="max-container section-padding">
           <div className="flex items-center justify-between h-[70px]">
-            {/* Logo — text-based to avoid image sizing issues */}
-            <Link href="/" className="shrink-0 flex flex-col">
-              <span className={cn('font-display text-[26px] font-bold leading-none tracking-tight transition-colors duration-500', scrolled ? 'text-brand-forest' : 'text-white')}>Lakefront</span>
-              <span className={cn('text-[9px] font-body font-semibold tracking-[0.2em] uppercase mt-0.5 transition-colors duration-500', scrolled ? 'text-brand-gold' : 'text-brand-gold/80')}>Estates & Villas</span>
+            {/* Logo — same image as lakefrontestatesfl.com */}
+            <Link href="/" className="shrink-0">
+              <img
+                src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-dark-no-icon-large-no-bg-scaled.png"
+                alt="Lakefront Estates & Villas"
+                className={cn('h-14 w-auto transition-all duration-500', scrolled ? '' : 'brightness-0 invert')}
+              />
             </Link>
 
             {/* Desktop Nav */}
