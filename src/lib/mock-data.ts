@@ -1,0 +1,42 @@
+import type { JobOpening, Business, ServiceProvider, CommercialSpace, InvestorLead, JobApplication } from '@/types';
+
+export const mockJobs: JobOpening[] = [
+  { id:'job-001', title:'Community Center Manager', slug:'community-center-manager', description:'Lead the daily operations of the Lakefront Estates Community Center.', requirements:'5+ years management experience', benefits:'Competitive salary, health insurance', employerName:'Lakefront Estates Management', category:'Management', type:'full-time', workMode:'on-site', location:'Okeechobee, FL', salaryMin:55000, salaryMax:72000, salaryType:'annual', status:'published', isPublic:true, postedDate:'2026-03-10', applicationCount:12 },
+  { id:'job-002', title:'Retail Store Associate', slug:'retail-store-associate', description:'Join our growing retail team at the Lakefront Shopping Plaza.', requirements:'Customer service experience preferred', benefits:'Flexible scheduling, employee discounts', employerName:'Lakefront Shopping Plaza', category:'Retail', type:'part-time', workMode:'on-site', location:'Okeechobee, FL', salaryMin:15, salaryMax:18, salaryType:'hourly', status:'published', isPublic:true, postedDate:'2026-03-15', applicationCount:8 },
+  { id:'job-003', title:'Medical Office Receptionist', slug:'medical-office-receptionist', description:'Front desk reception for the Lakefront Medical Center.', requirements:'Medical office experience, EMR proficiency', benefits:'Full benefits package', employerName:'Lakefront Medical Center', category:'Healthcare', type:'full-time', workMode:'on-site', location:'Okeechobee, FL', salaryMin:38000, salaryMax:45000, salaryType:'annual', status:'published', isPublic:true, postedDate:'2026-03-08', applicationCount:15 },
+  { id:'job-004', title:'Maintenance Technician', slug:'maintenance-technician', description:'Responsible for upkeep and maintenance of community facilities.', requirements:'Trade certification preferred', benefits:'Competitive hourly rate, overtime', employerName:'Lakefront Property Management', category:'Maintenance', type:'full-time', workMode:'on-site', location:'Okeechobee, FL', salaryMin:20, salaryMax:28, salaryType:'hourly', status:'published', isPublic:true, postedDate:'2026-03-12', applicationCount:6 },
+  { id:'job-005', title:'Marketing Coordinator', slug:'marketing-coordinator', description:'Drive awareness and engagement for Lakefront Economic Development.', requirements:'Marketing degree or 3+ years experience', benefits:'Hybrid work option, professional development', employerName:'Lakefront Economic Development', category:'Marketing', type:'full-time', workMode:'hybrid', location:'Okeechobee, FL', salaryMin:42000, salaryMax:55000, salaryType:'annual', status:'published', isPublic:true, postedDate:'2026-03-05', applicationCount:22 },
+  { id:'job-006', title:'Security Officer', slug:'security-officer', description:'Ensure the safety and security of Lakefront Estates community.', requirements:'Valid FL Class D Security License', benefits:'Shift differentials, benefits for full-time', employerName:'Lakefront Estates Security', category:'Security', type:'full-time', workMode:'on-site', location:'Okeechobee, FL', salaryMin:16, salaryMax:22, salaryType:'hourly', status:'published', isPublic:true, postedDate:'2026-03-01', applicationCount:9 },
+];
+
+export const mockBusinesses: Business[] = [
+  { id:'biz-001', name:'Lakefront Supermarket', slug:'lakefront-supermarket', description:'Full-service grocery store serving the Lakefront community.', category:'food-beverage', contactName:'David Greenfeld', contactEmail:'market@lakefrontestatesfl.com', contactPhone:'863-333-9401', status:'active', isPublic:true, tags:['grocery','kosher','bakery'] },
+  { id:'biz-002', name:'Lakefront Medical Center', slug:'lakefront-medical-center', description:'Comprehensive primary care and urgent care facility.', category:'healthcare', contactName:'Dr. Sarah Miller', contactEmail:'medical@lakefrontestatesfl.com', status:'active', isPublic:true, tags:['medical','primary-care'] },
+  { id:'biz-003', name:'Lakefront Learning Academy', slug:'lakefront-learning-academy', description:'Educational institution for children of all ages.', category:'education', contactName:'Rabbi Moshe Katz', contactEmail:'education@lakefrontestatesfl.com', status:'active', isPublic:true, tags:['education','school'] },
+  { id:'biz-004', name:'Lakefront Professional Plaza', slug:'lakefront-professional-plaza', description:'Multi-tenant office complex for professional services.', category:'professional-services', contactName:'Mark Thompson', contactEmail:'offices@lakefrontestatesfl.com', status:'approved', isPublic:true, tags:['office','professional'] },
+];
+
+export const mockProviders: ServiceProvider[] = [
+  { id:'prov-001', name:'Sunshine Landscaping LLC', description:'Commercial and residential landscaping.', category:'landscaping', contactName:'Carlos Rodriguez', contactEmail:'carlos@sunshinelandscaping.com', contactPhone:'863-555-0101', status:'active', isPublic:true },
+  { id:'prov-002', name:'TechConnect Solutions', description:'IT support, networking, and security systems.', category:'technology', contactName:'Mike Chen', contactEmail:'mike@techconnect.com', status:'active', isPublic:true },
+  { id:'prov-003', name:'Florida Commercial Cleaning', description:'Professional cleaning services for commercial spaces.', category:'cleaning', contactName:'Ana Perez', contactEmail:'ana@flcleaningpro.com', status:'active', isPublic:true },
+];
+
+export const mockSpaces: CommercialSpace[] = [
+  { id:'space-001', name:'Retail Suite A-101', slug:'retail-suite-a-101', description:'Prime ground-floor retail space. High visibility, move-in ready.', type:'retail', sqft:1200, monthlyRate:2400, building:'Shopping Plaza A', floor:'Ground', unit:'A-101', amenities:['Storefront','Parking','Loading dock','HVAC'], status:'available', isPublic:true },
+  { id:'space-002', name:'Office Suite B-204', slug:'office-suite-b-204', description:'Professional office with reception area and conference room.', type:'office', sqft:850, monthlyRate:1700, building:'Professional Plaza B', floor:'2nd', unit:'B-204', amenities:['Conference room','Kitchenette','Parking','Fiber internet'], status:'available', isPublic:true },
+  { id:'space-003', name:'Retail Suite A-105', slug:'retail-suite-a-105', description:'Corner retail unit with dual entrances. Ideal for restaurant.', type:'retail', sqft:2200, monthlyRate:4400, building:'Shopping Plaza A', floor:'Ground', unit:'A-105', amenities:['Corner location','Dual entrance','Grease trap','Parking'], status:'available', isPublic:true },
+  { id:'space-004', name:'Warehouse Unit W-01', slug:'warehouse-unit-w-01', description:'Light industrial/warehouse space with drive-in access.', type:'warehouse', sqft:3500, monthlyRate:3500, building:'Warehouse Complex', floor:'Ground', unit:'W-01', amenities:['Drive-in bay','16ft ceiling','3-phase power','Office area'], status:'available', isPublic:true },
+];
+
+export const mockApplications: JobApplication[] = [
+  { id:'app-001', jobId:'job-001', jobTitle:'Community Center Manager', contactId:'c-001', applicantName:'Rebecca Johnson', applicantEmail:'rebecca@email.com', applicantPhone:'561-555-0111', status:'reviewing', dateApplied:'2026-03-12' },
+  { id:'app-002', jobId:'job-001', jobTitle:'Community Center Manager', contactId:'c-002', applicantName:'Michael Davis', applicantEmail:'mdavis@email.com', status:'interview', dateApplied:'2026-03-11' },
+  { id:'app-003', jobId:'job-003', jobTitle:'Medical Office Receptionist', contactId:'c-003', applicantName:'Sarah Kim', applicantEmail:'skim@email.com', applicantPhone:'772-555-0222', status:'new', dateApplied:'2026-03-18' },
+  { id:'app-004', jobId:'job-005', jobTitle:'Marketing Coordinator', contactId:'c-004', applicantName:'James Wilson', applicantEmail:'jwilson@email.com', status:'new', dateApplied:'2026-03-19' },
+];
+
+export const mockInvestors: InvestorLead[] = [
+  { id:'inv-001', contactName:'Robert Sterling', contactEmail:'rsterling@capitalgroup.com', contactPhone:'212-555-0300', companyName:'Sterling Capital Group', investmentInterest:'Commercial real estate', investmentRange:'$500K - $2M', status:'due-diligence', contactId:'c-010', dateSubmitted:'2026-02-15' },
+  { id:'inv-002', contactName:'Lisa Chen', contactEmail:'lchen@investcorp.com', companyName:'Pacific Investment Corp', investmentInterest:'Mixed-use development', investmentRange:'$1M - $5M', status:'meeting', contactId:'c-011', dateSubmitted:'2026-03-01' },
+];
