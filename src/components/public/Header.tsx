@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,79 +18,61 @@ export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  useEffect(() => { const h = () => setScrolled(window.scrollY > 50); window.addEventListener('scroll', h); return () => window.removeEventListener('scroll', h); }, []);
 
   return (
-    <header className={cn(
-      'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
-      scrolled ? 'bg-white/98 backdrop-blur-md shadow-md' : 'bg-brand-forest/95 backdrop-blur-sm'
-    )}>
-      <div className="max-container section-padding">
-        <div className="flex items-center justify-between h-20 lg:h-24">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 shrink-0">
-            <img
-              src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-dark-no-icon-large-no-bg-scaled.png"
-              alt="Lakefront Estates & Villas"
-              className={cn('h-12 lg:h-16 w-auto transition-all duration-500', scrolled ? 'brightness-100' : 'brightness-0 invert')}
-            />
-          </Link>
-
-          {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <div key={item.label} className="relative" onMouseEnter={() => item.children && setActiveDropdown(item.label)} onMouseLeave={() => setActiveDropdown(null)}>
-                <Link href={item.href} className={cn(
-                  'px-4 py-2 text-sm font-body font-medium transition-colors duration-200 flex items-center gap-1',
-                  scrolled ? 'text-brand-text/80 hover:text-brand-forest' : 'text-white/85 hover:text-white'
-                )}>
-                  {item.label}{item.children && <ChevronDown className="w-3.5 h-3.5" />}
-                </Link>
-                {item.children && activeDropdown === item.label && (
-                  <div className="absolute top-full left-0 mt-0 w-48 bg-white rounded-sm shadow-xl border border-gray-100 py-2 animate-fade-in">
-                    {item.children.map((child) => (<Link key={child.href} href={child.href} className="block px-4 py-2.5 text-sm font-body text-brand-text/80 hover:bg-brand-cream hover:text-brand-forest transition-colors">{child.label}</Link>))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </nav>
-
-          {/* CTA */}
-          <div className="hidden lg:flex items-center gap-3">
-            <Link href="/apply" className={cn(
-              'inline-flex items-center justify-center px-7 py-3 font-body font-semibold text-xs tracking-[0.15em] uppercase rounded-sm transition-all duration-300',
-              scrolled
-                ? 'bg-brand-gold text-white hover:bg-brand-gold/90 hover:shadow-lg'
-                : 'bg-brand-gold text-white hover:bg-brand-gold/90 hover:shadow-lg'
-            )}>Application</Link>
+    <>
+      {/* Top ribbon bar — matches reference site */}
+      <div className={cn('fixed top-0 left-0 right-0 z-[60] transition-all duration-500', scrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-10 opacity-100')}>
+        <div className="h-full bg-brand-dark/90 backdrop-blur-sm flex items-center justify-between max-container section-padding">
+          <div className="flex items-center gap-4">
+            <a href="tel:+18633339400" className="text-[11px] text-white/50 font-body hover:text-brand-gold transition-colors">863.333.9400</a>
+            <span className="text-white/20">|</span>
+            <a href="mailto:info@lakefrontestatesfl.com" className="text-[11px] text-white/50 font-body hover:text-brand-gold transition-colors">info@lakefrontestatesfl.com</a>
           </div>
-
-          {/* Mobile toggle */}
-          <button onClick={() => setMobileOpen(!mobileOpen)} className={cn('lg:hidden p-2', scrolled ? 'text-brand-forest' : 'text-white')} aria-label="Toggle navigation">
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <Link href="/portal/login" className="text-[11px] text-white/40 font-body hover:text-brand-gold transition-colors">Staff Portal</Link>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-100 shadow-lg animate-fade-in">
-          <nav className="section-padding py-4 space-y-1">
-            {NAV_ITEMS.map((item) => (
-              <div key={item.label}>
-                <Link href={item.href} className="block py-3 text-base font-body font-medium text-brand-text/80 hover:text-brand-forest" onClick={() => setMobileOpen(false)}>{item.label}</Link>
-                {item.children?.map((child) => (<Link key={child.href} href={child.href} className="block py-2 pl-4 text-sm font-body text-brand-muted hover:text-brand-forest" onClick={() => setMobileOpen(false)}>{child.label}</Link>))}
-              </div>
-            ))}
-            <div className="pt-4"><Link href="/apply" className="btn-primary w-full text-center text-xs" onClick={() => setMobileOpen(false)}>Application</Link></div>
-          </nav>
+      {/* Main header */}
+      <header className={cn(
+        'fixed left-0 right-0 z-50 transition-all duration-500',
+        scrolled ? 'top-0 bg-white shadow-lg' : 'top-10 bg-white/5 backdrop-blur-sm border-b border-white/10'
+      )}>
+        <div className="max-container section-padding">
+          <div className="flex items-center justify-between h-20">
+            <Link href="/" className="shrink-0">
+              <img src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-dark-no-icon-large-no-bg-scaled.png" alt="Lakefront Estates" className={cn('h-10 lg:h-12 w-auto transition-all duration-500', scrolled ? '' : 'brightness-0 invert')} />
+            </Link>
+            <nav className="hidden lg:flex items-center gap-0.5">
+              {NAV_ITEMS.map((item) => (
+                <div key={item.label} className="relative" onMouseEnter={() => item.children && setActiveDropdown(item.label)} onMouseLeave={() => setActiveDropdown(null)}>
+                  <Link href={item.href} className={cn('px-4 py-2 text-[13px] font-body font-medium transition-colors duration-200 flex items-center gap-1 uppercase tracking-wider', scrolled ? 'text-brand-text/70 hover:text-brand-forest' : 'text-white/80 hover:text-white')}>
+                    {item.label}{item.children && <ChevronDown className="w-3 h-3" />}
+                  </Link>
+                  {item.children && activeDropdown === item.label && (
+                    <div className="absolute top-full left-0 mt-0 w-48 bg-white shadow-xl border border-gray-100 py-2 animate-fade-in">
+                      {item.children.map((child) => (<Link key={child.href} href={child.href} className="block px-4 py-2.5 text-[13px] font-body text-brand-text/70 hover:bg-brand-cream hover:text-brand-forest transition-colors uppercase tracking-wider">{child.label}</Link>))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </nav>
+            <Link href="/apply" className={cn('hidden lg:inline-flex items-center justify-center px-6 py-2.5 font-body font-semibold text-[11px] tracking-[0.2em] uppercase transition-all duration-300', scrolled ? 'bg-brand-gold text-white hover:bg-brand-gold/90 rounded-sm' : 'bg-brand-gold text-white hover:bg-brand-gold/90 rounded-sm')}>Application</Link>
+            <button onClick={() => setMobileOpen(!mobileOpen)} className={cn('lg:hidden p-2', scrolled ? 'text-brand-forest' : 'text-white')} aria-label="Toggle navigation">
+              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
-      )}
-    </header>
+        {mobileOpen && (
+          <div className="lg:hidden bg-white border-t border-gray-100 shadow-lg animate-fade-in">
+            <nav className="section-padding py-4 space-y-1">
+              {NAV_ITEMS.map((item) => (<div key={item.label}><Link href={item.href} className="block py-3 text-sm font-body font-medium text-brand-text/70 hover:text-brand-forest uppercase tracking-wider" onClick={() => setMobileOpen(false)}>{item.label}</Link>{item.children?.map((child) => (<Link key={child.href} href={child.href} className="block py-2 pl-4 text-xs font-body text-brand-muted hover:text-brand-forest uppercase tracking-wider" onClick={() => setMobileOpen(false)}>{child.label}</Link>))}</div>))}
+              <div className="pt-4"><Link href="/apply" className="btn-primary w-full text-center text-xs" onClick={() => setMobileOpen(false)}>Application</Link></div>
+            </nav>
+          </div>
+        )}
+      </header>
+    </>
   );
 }
