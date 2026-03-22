@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, TrendingUp, Warehouse, FileEdit, Users, Settings, Search, Bell, Menu, Globe, LogOut, Shield, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, TrendingUp, Warehouse, FileEdit, Users, Settings, Search, Bell, Menu, Globe, LogOut, Shield, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { label:'Spaces', href:'/portal/spaces', icon:Warehouse },
   { label:'Content', href:'/portal/content', icon:FileEdit },
   { label:'Users & Access', href:'/portal/users', icon:Users },
+  { label:'Skills Taxonomy', href:'/portal/skills', icon:Tag },
   { label:'Settings', href:'/portal/settings', icon:Settings },
 ];
 
@@ -33,7 +34,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       if (!authUser) { window.location.replace('/auth/login'); return; }
       const { data: profile } = await supabase.from('lf_profiles').select('full_name, email, role, portal_type, account_status').eq('id', authUser.id).maybeSingle();
       if (!profile || !['super_admin','admin'].includes(profile.role)) {
-        // Not an admin — redirect to correct portal
         if (profile?.portal_type === 'employer') { window.location.replace('/employer/dashboard'); return; }
         window.location.replace('/applicant/dashboard'); return;
       }
