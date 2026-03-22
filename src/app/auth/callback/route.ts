@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import type { EmailOtpType } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     await supabase.auth.exchangeCodeForSession(code);
   } else if (token_hash && type) {
-    await supabase.auth.verifyOtp({ token_hash, type: type as 'email' | 'sms' });
+    await supabase.auth.verifyOtp({ token_hash, type: type as EmailOtpType });
   }
 
   // Determine redirect based on user profile
