@@ -3,20 +3,20 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, ArrowRight, Eye, EyeOff, Copy, CheckCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get('redirect') || '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [forgotMode, setForgotMode] = useState(false);
-  const [resetUrl, setResetUrl] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const supabase = createClient();
 
   const handleLogin = async () => {
     setLoading(true); setError('');
@@ -42,28 +42,16 @@ function LoginForm() {
   const handleForgotPassword = async () => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Failed to generate reset link');
-        return;
-      }
-      if (data.resetUrl) {
-        setResetUrl(data.resetUrl);
-      }
+      // Use Supabase native password reset — sends email through Supabase Auth
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+        email.toLowerCase().trim(),
+        { redirectTo: `${window.location.origin}/auth/reset-password` }
+      );
+      if (resetErr) throw resetErr;
+      setForgotSent(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed');
+      setError(err instanceof Error ? err.message : 'Failed to send reset email');
     } finally { setLoading(false); }
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(resetUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -78,31 +66,22 @@ function LoginForm() {
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 font-body">{error}</div>}
 
           {forgotMode ? (
-            resetUrl ? (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                  <h3 className="font-display font-bold text-brand-forest text-lg mb-2">Password Reset Link</h3>
-                  <p className="text-xs font-body text-brand-muted mb-4">Click the button below to set a new password, or copy the link.</p>
-                </div>
-                <a href={resetUrl} className="btn-primary w-full text-center block">Set New Password</a>
-                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border">
-                  <input type="text" value={resetUrl} readOnly className="flex-1 text-[10px] font-mono text-brand-muted outline-none bg-transparent" />
-                  <button onClick={handleCopy} className="p-1.5 text-brand-sage hover:text-brand-forest shrink-0">
-                    {copied ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-                <button onClick={() => { setForgotMode(false); setResetUrl(''); }} className="text-sm font-body text-brand-sage hover:text-brand-forest w-full text-center">&larr; Back to Login</button>
+            forgotSent ? (
+              <div className="text-center py-6">
+                <Mail className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h3 className="font-display font-bold text-brand-forest text-lg mb-2">Check Your Email</h3>
+                <p className="text-sm font-body text-brand-muted">If an account exists for <strong>{email}</strong>, we sent a password reset link to that email.</p>
+                <button onClick={() => { setForgotMode(false); setForgotSent(false); }} className="text-sm font-body text-brand-sage hover:text-brand-forest mt-4">&larr; Back to Login</button>
               </div>
             ) : (
               <div className="space-y-4">
                 <h3 className="font-display font-semibold text-brand-forest text-center">Reset Password</h3>
-                <p className="text-xs font-body text-brand-muted text-center">Enter your email to get a password reset link.</p>
+                <p className="text-xs font-body text-brand-muted text-center">Enter your email and we&apos;ll send a password reset link.</p>
                 <div className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-sm focus-within:ring-2 focus-within:ring-brand-sage/30">
                   <Mail className="w-4 h-4 text-gray-400" />
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="flex-1 font-body text-brand-text placeholder:text-gray-400 outline-none bg-transparent" onKeyDown={e => e.key === 'Enter' && email && handleForgotPassword()} />
                 </div>
-                <button onClick={handleForgotPassword} disabled={loading || !email} className="btn-primary w-full disabled:opacity-50">{loading ? 'Generating...' : 'Get Reset Link'}</button>
+                <button onClick={handleForgotPassword} disabled={loading || !email} className="btn-primary w-full disabled:opacity-50">{loading ? 'Sending...' : 'Send Reset Link'}</button>
                 <button onClick={() => setForgotMode(false)} className="text-sm font-body text-brand-sage hover:text-brand-forest w-full text-center">&larr; Back to Login</button>
               </div>
             )
