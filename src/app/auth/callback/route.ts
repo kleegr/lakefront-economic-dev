@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import type { EmailOtpType } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const token_hash = requestUrl.searchParams.get('token_hash');
-  const type = requestUrl.searchParams.get('type');
+
+  if (!code) {
+    return NextResponse.redirect(new URL('/auth/login?error=no_code', request.url));
+  }
 
   const response = NextResponse.redirect(new URL('/applicant/dashboard', request.url));
   const supabase = createServerClient(
@@ -24,10 +25,9 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
-  } else if (token_hash && type) {
-    await supabase.auth.verifyOtp({ token_hash, type: type as EmailOtpType });
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return NextResponse.redirect(new URL('/auth/login?error=auth_failed', request.url));
   }
 
   // Determine redirect based on user profile
