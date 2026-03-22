@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Search, User, Shield } from 'lucide-react';
 
@@ -15,18 +15,14 @@ export default function CandidateSearchPage() {
   const handleSearch = async () => {
     if (!query.trim()) return;
     setSearched(true);
-    // Privacy-safe: only search approved applicant members with complete profiles who have applied to YOUR jobs
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    // Get employer's job IDs
     const { data: myJobs } = await supabase.from('lf_jobs').select('id').eq('created_by', user.id);
     if (!myJobs || myJobs.length === 0) { setCandidates([]); return; }
     const jobIds = myJobs.map(j => j.id);
-    // Get member IDs who applied to employer's jobs
     const { data: appMembers } = await supabase.from('lf_applications').select('member_id').in('job_id', jobIds);
     if (!appMembers || appMembers.length === 0) { setCandidates([]); return; }
-    const memberIds = [...new Set(appMembers.map(a => a.member_id).filter(Boolean))];
-    // Search those members by name/skills
+    const memberIds = Array.from(new Set(appMembers.map(a => a.member_id).filter(Boolean)));
     const { data: results } = await supabase.from('lf_household_members')
       .select('id, full_name, age, years_experience, skills, desired_earnings, availability, experience_summary, profile_complete')
       .in('id', memberIds)
@@ -39,12 +35,10 @@ export default function CandidateSearchPage() {
     <div>
       <h1 className="font-display text-2xl font-bold text-brand-forest mb-1">Candidate Search</h1>
       <p className="text-sm font-body text-gray-500 mb-6">Search among candidates who have applied to your jobs</p>
-
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs font-body text-blue-800 mb-4 flex items-center gap-2">
         <Shield className="w-4 h-4 shrink-0" />
-        For privacy, only candidates who have applied to your job postings are searchable. Full applicant database is not exposed.
+        For privacy, only candidates who have applied to your job postings are searchable.
       </div>
-
       <div className="flex gap-2 mb-6">
         <div className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
           <Search className="w-4 h-4 text-gray-400" />
@@ -52,7 +46,6 @@ export default function CandidateSearchPage() {
         </div>
         <button onClick={handleSearch} className="px-4 py-2 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold">Search</button>
       </div>
-
       {searched && candidates.length === 0 && <p className="text-center py-8 text-sm text-gray-400 font-body">No matching candidates found.</p>}
       {candidates.length > 0 && (
         <div className="bg-white rounded-xl border overflow-hidden">
