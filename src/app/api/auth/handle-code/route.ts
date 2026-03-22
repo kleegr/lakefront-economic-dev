@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+// This route handles the PKCE code exchange when Supabase redirects to the site root with ?code=
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const token_hash = requestUrl.searchParams.get('token_hash');
-  const type = requestUrl.searchParams.get('type');
+
+  if (!code) {
+    return NextResponse.redirect(new URL('/auth/login?error=no_code', request.url));
+  }
 
   const response = NextResponse.redirect(new URL('/applicant/dashboard', request.url));
   const supabase = createServerClient(
@@ -23,13 +26,11 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
-  } else if (token_hash && type) {
-    await supabase.auth.verifyOtp({ token_hash, type: type as 'email' | 'sms' });
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return NextResponse.redirect(new URL('/auth/login?error=code_exchange_failed', request.url));
   }
 
-  // Determine redirect based on user profile
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
     const { data: profile } = await supabase.from('lf_profiles').select('role,portal_type').eq('id', user.id).single();
