@@ -5,6 +5,7 @@ import { useHousehold } from '@/lib/household-context';
 import { Heart, Briefcase, Bell, DollarSign, MapPin, Clock } from 'lucide-react';
 
 type Job = Record<string,unknown>;
+const s = (j: Job, k: string): string => (j[k] as string) || '';
 
 export default function BrowseJobsPage() {
   const { activeMember, approved } = useHousehold();
@@ -23,7 +24,7 @@ export default function BrowseJobsPage() {
       setJobs(data || []);
       if (activeMember) {
         const { data: saved } = await supabase.from('lf_saved_jobs').select('job_id').eq('member_id', activeMember.id);
-        setSavedIds((saved||[]).map((s: Record<string,unknown>) => s.job_id as string));
+        setSavedIds((saved||[]).map((sv: Record<string,unknown>) => sv.job_id as string));
         const { data: notifs } = await supabase.from('lf_job_notifications').select('job_id').eq('member_id', activeMember.id);
         setNotifyIds((notifs||[]).map((n: Record<string,unknown>) => n.job_id as string));
       }
@@ -38,7 +39,7 @@ export default function BrowseJobsPage() {
   };
   const requestNotify = async (jobId: string) => { if (!activeMember) return; await supabase.from('lf_job_notifications').insert({ member_id: activeMember.id, job_id: jobId }); setNotifyIds(prev => [...prev, jobId]); };
   const toggleSelect = (jobId: string) => { if (selected.includes(jobId)) setSelected(prev => prev.filter(id => id !== jobId)); else if (selected.length < 3) setSelected(prev => [...prev, jobId]); };
-  const canApply = (j: Job) => ['open','pending','accepting_offers'].includes((j.job_status as string) || 'open');
+  const canApply = (j: Job) => ['open','pending','accepting_offers'].includes(s(j,'job_status') || 'open');
 
   const submitApplications = async () => {
     if (!activeMember || !approved || selected.length === 0) return;
@@ -53,9 +54,9 @@ export default function BrowseJobsPage() {
   };
 
   const statusBadge = (j: Job) => {
-    const s = (j.job_status as string) || 'open';
+    const st = s(j,'job_status') || 'open';
     const map: Record<string,{label:string;cls:string}> = { open:{label:'Open',cls:'bg-green-50 text-green-700'}, pending:{label:'Pending',cls:'bg-amber-50 text-amber-700'}, hired:{label:'Filled',cls:'bg-gray-100 text-gray-500'}, filled:{label:'Filled',cls:'bg-gray-100 text-gray-500'}, coming_soon:{label:'Coming Soon',cls:'bg-blue-50 text-blue-700'}, accepting_offers:{label:'Accepting Offers',cls:'bg-purple-50 text-purple-700'} };
-    const m = map[s] || map.open;
+    const m = map[st] || map.open;
     return <span className={`px-2 py-0.5 text-[10px] rounded font-semibold ${m.cls}`}>{m.label}</span>;
   };
 
@@ -71,21 +72,21 @@ export default function BrowseJobsPage() {
       {!activeMember && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm font-body text-blue-800 mb-4">Add a household member first.</div>}
       {activeMember && !activeMember.profile_complete && <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm font-body text-amber-800 mb-4">{activeMember.full_name}&apos;s profile is incomplete.</div>}
       <div className="space-y-3">{jobs.length === 0 ? <p className="text-center py-12 text-sm text-gray-400 font-body">No jobs yet.</p> : jobs.map(j => {
-        const jid = j.id as string; const ca = canApply(j); const isSaved = savedIds.includes(jid);
-        const isCS = (j.job_status as string)==='coming_soon'; const isAO = (j.job_status as string)==='accepting_offers';
+        const jid = s(j,'id'); const ca = canApply(j); const isSaved = savedIds.includes(jid);
+        const isCS = s(j,'job_status')==='coming_soon'; const isAO = s(j,'job_status')==='accepting_offers';
         const isSel = selected.includes(jid); const isNot = notifyIds.includes(jid);
         return (
           <div key={jid} className={`bg-white rounded-xl border ${isSel?'border-brand-forest ring-2 ring-brand-sage/30':'border-gray-200'} p-5`}>
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1"><h3 className="font-display font-bold text-brand-forest">{j.title as string}</h3>{statusBadge(j)}</div>
+                <div className="flex items-center gap-2 mb-1"><h3 className="font-display font-bold text-brand-forest">{s(j,'title')}</h3>{statusBadge(j)}</div>
                 <div className="flex flex-wrap gap-3 text-xs text-gray-400 font-body mb-2">
-                  {j.company_name && <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{j.company_name as string}</span>}
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{(j.location as string)||'Lakefront Estates'}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{j.job_type as string}</span>
-                  {j.salary_range && <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{j.salary_range as string}</span>}
+                  {s(j,'company_name') && <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{s(j,'company_name')}</span>}
+                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s(j,'location') || 'Lakefront Estates'}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{s(j,'job_type')}</span>
+                  {s(j,'salary_range') && <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{s(j,'salary_range')}</span>}
                 </div>
-                {j.description && <p className="text-xs font-body text-gray-500 line-clamp-2">{j.description as string}</p>}
+                {s(j,'description') && <p className="text-xs font-body text-gray-500 line-clamp-2">{s(j,'description')}</p>}
               </div>
               <div className="flex items-center gap-1 ml-4 shrink-0">
                 {activeMember && <button onClick={()=>toggleSave(jid)} className={`p-2 rounded-lg ${isSaved?'text-red-500 bg-red-50':'text-gray-300 hover:text-red-400'}`}><Heart className={`w-4 h-4 ${isSaved?'fill-current':''}`} /></button>}
