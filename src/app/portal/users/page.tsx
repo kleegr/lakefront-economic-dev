@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { UserPlus, Mail, Shield, CheckCircle, Clock, XCircle, Copy, Send, Eye, Pencil, Trash2, Ban, RotateCcw, X, ChevronDown, ArrowLeft } from 'lucide-react';
+import { UserPlus, Mail, Shield, CheckCircle, Clock, XCircle, Copy, Send, Eye, Pencil, Trash2, Ban, RotateCcw, X } from 'lucide-react';
 
 const ALL_PERMISSIONS = [
   'jobs.view','jobs.create','jobs.edit','jobs.delete','jobs.publish',
@@ -24,6 +24,8 @@ const ROLE_PRESETS: Record<string, string[]> = {
 };
 
 type User = Record<string, unknown>;
+const str = (u: User, k: string): string => (u[k] as string) || '';
+const bool = (u: User, k: string): boolean => u[k] as boolean || false;
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -79,19 +81,19 @@ export default function UsersPage() {
     if (!editUser) return;
     await supabase.from('lf_profiles').update({
       role: editRole, portal_type: editPortal, account_status: editStatus, full_name: editName,
-    }).eq('id', editUser.id as string);
+    }).eq('id', str(editUser, 'id'));
     setEditUser(null);
     loadData();
   };
 
   const handleSuspend = async (u: User) => {
-    const newStatus = (u.account_status as string) === 'suspended' ? 'approved' : 'suspended';
-    await supabase.from('lf_profiles').update({ account_status: newStatus }).eq('id', u.id as string);
+    const newStatus = str(u, 'account_status') === 'suspended' ? 'approved' : 'suspended';
+    await supabase.from('lf_profiles').update({ account_status: newStatus }).eq('id', str(u, 'id'));
     loadData();
   };
 
   const handleDelete = async (u: User) => {
-    await supabase.from('lf_profiles').delete().eq('id', u.id as string);
+    await supabase.from('lf_profiles').delete().eq('id', str(u, 'id'));
     setConfirmDelete(null);
     loadData();
   };
@@ -112,13 +114,13 @@ export default function UsersPage() {
     return <span className={`px-2 py-0.5 text-xs rounded font-semibold ${cls}`}>{r}</span>;
   };
   const getPortalPreview = (u: User) => {
-    const role = u.role as string;
+    const role = str(u, 'role');
     if (['super_admin','admin'].includes(role)) return '/portal/dashboard';
-    if ((u.portal_type as string) === 'employer') return '/employer/dashboard';
+    if (str(u, 'portal_type') === 'employer') return '/employer/dashboard';
     return '/applicant/dashboard';
   };
 
-  const filteredUsers = tab === 'all' ? users : tab === 'admins' ? users.filter(u => ['super_admin','admin'].includes(u.role as string)) : tab === 'employers' ? users.filter(u => (u.role as string) === 'employer' || (u.portal_type as string) === 'employer') : tab === 'applicants' ? users.filter(u => (u.role as string) === 'applicant') : users;
+  const filteredUsers = tab === 'all' ? users : tab === 'admins' ? users.filter(u => ['super_admin','admin'].includes(str(u,'role'))) : tab === 'employers' ? users.filter(u => str(u,'role') === 'employer' || str(u,'portal_type') === 'employer') : tab === 'applicants' ? users.filter(u => str(u,'role') === 'applicant') : users;
 
   return (
     <div>
@@ -130,8 +132,8 @@ export default function UsersPage() {
               <div className="flex items-center gap-3">
                 <Eye className="w-5 h-5 text-amber-600" />
                 <div>
-                  <h3 className="font-display font-bold text-brand-forest">Viewing as {impersonating.full_name as string || impersonating.email as string}</h3>
-                  <p className="text-xs text-brand-muted font-body">Role: {impersonating.role as string} | Portal: {impersonating.portal_type as string}</p>
+                  <h3 className="font-display font-bold text-brand-forest">Viewing as {str(impersonating,'full_name') || str(impersonating,'email')}</h3>
+                  <p className="text-xs text-brand-muted font-body">Role: {str(impersonating,'role')} | Portal: {str(impersonating,'portal_type')}</p>
                 </div>
               </div>
               <button onClick={() => setImpersonating(null)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
@@ -146,7 +148,7 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="font-display font-bold text-red-600 mb-2">Delete User?</h3>
-            <p className="text-sm font-body text-brand-muted mb-4">Permanently remove <strong>{confirmDelete.email as string}</strong>? This cannot be undone.</p>
+            <p className="text-sm font-body text-brand-muted mb-4">Permanently remove <strong>{str(confirmDelete,'email')}</strong>? This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-body font-semibold">Cancel</button>
               <button onClick={() => handleDelete(confirmDelete)} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-body font-semibold hover:bg-red-700">Delete</button>
@@ -177,7 +179,7 @@ export default function UsersPage() {
                     <option value="approved">Approved</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option>
                   </select></div>
               </div>
-              <div className="text-xs font-body text-brand-muted bg-gray-50 p-2 rounded">Email: {editUser.email as string} &middot; ID: {(editUser.id as string).substring(0,8)}...</div>
+              <div className="text-xs font-body text-brand-muted bg-gray-50 p-2 rounded">Email: {str(editUser,'email')} &middot; ID: {str(editUser,'id').substring(0,8)}...</div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setEditUser(null)} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-body font-semibold">Cancel</button>
@@ -245,14 +247,20 @@ export default function UsersPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="font-display text-2xl font-bold text-brand-forest">Users & Access</h1><p className="text-sm font-body text-brand-muted">Manage all users, invitations, and access control</p></div>
+        <div><h1 className="font-display text-2xl font-bold text-brand-forest">Users &amp; Access</h1><p className="text-sm font-body text-brand-muted">Manage all users, invitations, and access control</p></div>
         <button onClick={() => { setShowInvite(true); handleRoleChange('employer'); }} className="flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><UserPlus className="w-4 h-4" />Invite Business / Staff</button>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
-        {[{key:'all',label:'All Users',count:users.length},{key:'admins',label:'Admins',count:users.filter(u=>['super_admin','admin'].includes(u.role as string)).length},{key:'employers',label:'Employers',count:users.filter(u=>(u.role as string)==='employer').length},{key:'applicants',label:'Applicants',count:users.filter(u=>(u.role as string)==='applicant').length},{key:'invites',label:'Invitations',count:invitations.length}].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key as typeof tab)} className={`flex-1 px-3 py-2 rounded-md text-xs font-body font-semibold transition-colors ${tab === t.key ? 'bg-white text-brand-forest shadow-sm' : 'text-brand-muted hover:text-brand-forest'}`}>{t.label} <span className="ml-1 text-[10px] opacity-60">({t.count})</span></button>
+        {([
+          {key:'all' as const,label:'All Users',count:users.length},
+          {key:'admins' as const,label:'Admins',count:users.filter(u=>['super_admin','admin'].includes(str(u,'role'))).length},
+          {key:'employers' as const,label:'Employers',count:users.filter(u=>str(u,'role')==='employer').length},
+          {key:'applicants' as const,label:'Applicants',count:users.filter(u=>str(u,'role')==='applicant').length},
+          {key:'invites' as const,label:'Invitations',count:invitations.length},
+        ]).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)} className={`flex-1 px-3 py-2 rounded-md text-xs font-body font-semibold transition-colors ${tab === t.key ? 'bg-white text-brand-forest shadow-sm' : 'text-brand-muted hover:text-brand-forest'}`}>{t.label} <span className="ml-1 text-[10px] opacity-60">({t.count})</span></button>
         ))}
       </div>
 
@@ -266,18 +274,18 @@ export default function UsersPage() {
             <tbody>{filteredUsers.length === 0 ? (
               <tr><td colSpan={6} className="p-8 text-center text-brand-muted">No users found</td></tr>
             ) : filteredUsers.map((u: User) => (
-              <tr key={u.id as string} className="border-b border-gray-100 hover:bg-gray-50/50">
-                <td className="p-3"><div className="font-semibold text-brand-forest">{(u.full_name as string) || 'No name'}</div><div className="text-xs text-brand-muted">{u.email as string}</div></td>
-                <td className="p-3">{roleBadge(u.role as string)}</td>
-                <td className="p-3 text-xs font-body">{u.portal_type as string}</td>
-                <td className="p-3">{statusBadge(u.account_status as string)}</td>
-                <td className="p-3 text-xs">{(u.password_set as boolean) ? <span className="text-green-600">Invited</span> : <span className="text-blue-600">Application</span>}</td>
+              <tr key={str(u,'id')} className="border-b border-gray-100 hover:bg-gray-50/50">
+                <td className="p-3"><div className="font-semibold text-brand-forest">{str(u,'full_name') || 'No name'}</div><div className="text-xs text-brand-muted">{str(u,'email')}</div></td>
+                <td className="p-3">{roleBadge(str(u,'role'))}</td>
+                <td className="p-3 text-xs font-body">{str(u,'portal_type')}</td>
+                <td className="p-3">{statusBadge(str(u,'account_status'))}</td>
+                <td className="p-3 text-xs">{bool(u,'password_set') ? <span className="text-green-600">Invited</span> : <span className="text-blue-600">Application</span>}</td>
                 <td className="p-3">
                   <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => { setEditUser(u); setEditRole(u.role as string); setEditPortal(u.portal_type as string); setEditStatus(u.account_status as string); setEditName((u.full_name as string) || ''); }} className="p-1.5 text-gray-400 hover:text-brand-forest hover:bg-brand-sage/10 rounded transition-colors" title="Edit user"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => { setEditUser(u); setEditRole(str(u,'role')); setEditPortal(str(u,'portal_type')); setEditStatus(str(u,'account_status')); setEditName(str(u,'full_name')); }} className="p-1.5 text-gray-400 hover:text-brand-forest hover:bg-brand-sage/10 rounded transition-colors" title="Edit user"><Pencil className="w-3.5 h-3.5" /></button>
                     <button onClick={() => setImpersonating(u)} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors" title="View as this user"><Eye className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleSuspend(u)} className={`p-1.5 rounded transition-colors ${(u.account_status as string) === 'suspended' ? 'text-green-500 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={(u.account_status as string) === 'suspended' ? 'Reactivate' : 'Suspend'}>{(u.account_status as string) === 'suspended' ? <RotateCcw className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}</button>
-                    {(u.role as string) !== 'super_admin' && <button onClick={() => setConfirmDelete(u)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete user"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    <button onClick={() => handleSuspend(u)} className={`p-1.5 rounded transition-colors ${str(u,'account_status') === 'suspended' ? 'text-green-500 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={str(u,'account_status') === 'suspended' ? 'Reactivate' : 'Suspend'}>{str(u,'account_status') === 'suspended' ? <RotateCcw className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}</button>
+                    {str(u,'role') !== 'super_admin' && <button onClick={() => setConfirmDelete(u)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete user"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>
@@ -293,12 +301,12 @@ export default function UsersPage() {
                 <th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Portal</th><th className="p-3">Status</th><th className="p-3">Sent</th>
               </tr></thead>
               <tbody>{invitations.map((inv: User) => (
-                <tr key={inv.id as string} className="border-b border-gray-100 hover:bg-gray-50/50">
-                  <td className="p-3"><div className="font-semibold text-brand-forest">{inv.email as string}</div>{inv.full_name && <div className="text-xs text-brand-muted">{inv.full_name as string}</div>}</td>
-                  <td className="p-3">{roleBadge(inv.role as string)}</td>
-                  <td className="p-3 text-xs">{inv.portal_type as string}</td>
-                  <td className="p-3"><span className={`px-2 py-0.5 text-xs rounded font-semibold ${(inv.status as string) === 'accepted' ? 'bg-green-50 text-green-700' : (inv.status as string) === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>{inv.status as string}</span></td>
-                  <td className="p-3 text-xs text-brand-muted">{new Date(inv.created_at as string).toLocaleDateString()}</td>
+                <tr key={str(inv,'id')} className="border-b border-gray-100 hover:bg-gray-50/50">
+                  <td className="p-3"><div className="font-semibold text-brand-forest">{str(inv,'email')}</div>{str(inv,'full_name') && <div className="text-xs text-brand-muted">{str(inv,'full_name')}</div>}</td>
+                  <td className="p-3">{roleBadge(str(inv,'role'))}</td>
+                  <td className="p-3 text-xs">{str(inv,'portal_type')}</td>
+                  <td className="p-3"><span className={`px-2 py-0.5 text-xs rounded font-semibold ${str(inv,'status') === 'accepted' ? 'bg-green-50 text-green-700' : str(inv,'status') === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>{str(inv,'status')}</span></td>
+                  <td className="p-3 text-xs text-brand-muted">{str(inv,'created_at') ? new Date(str(inv,'created_at')).toLocaleDateString() : ''}</td>
                 </tr>
               ))}</tbody>
             </table>
