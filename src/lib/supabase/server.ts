@@ -9,8 +9,8 @@ export async function createServerSupabase() {
     {
       cookies: {
         getAll() { return cookieStore.getAll(); },
-        setAll(cookiesToSet) {
-          try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
+          try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options as Record<string, unknown>)); } catch { /* readonly in RSC */ }
         },
       },
     }

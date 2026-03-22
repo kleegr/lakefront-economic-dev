@@ -9,10 +9,10 @@ export async function updateSession(request: NextRequest) {
     {
       cookies: {
         getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options as Record<string, unknown>));
         },
       },
     }
@@ -20,11 +20,8 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // Portal routes require auth
   const isPortalRoute = path.startsWith('/portal') || path.startsWith('/applicant') || path.startsWith('/employer');
   const isLoginRoute = path === '/portal/login' || path === '/auth/login';
-  const isApiRoute = path.startsWith('/api/');
-  const isPublicRoute = !isPortalRoute && !isApiRoute;
 
   if (isPortalRoute && !isLoginRoute && !user) {
     const url = request.nextUrl.clone();
@@ -33,17 +30,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Role-based portal access
   if (user && isPortalRoute && !isLoginRoute) {
     const { data: profile } = await supabase.from('lf_profiles').select('role,account_status,portal_type').eq('id', user.id).single();
     if (profile) {
-      // Admin portal: only admin/super_admin
       if (path.startsWith('/portal') && !['super_admin','admin'].includes(profile.role)) {
         const url = request.nextUrl.clone();
         url.pathname = profile.portal_type === 'employer' ? '/employer/dashboard' : '/applicant/dashboard';
         return NextResponse.redirect(url);
       }
-      // Employer portal: only employer+
       if (path.startsWith('/employer') && profile.portal_type !== 'employer' && !['super_admin','admin'].includes(profile.role)) {
         const url = request.nextUrl.clone();
         url.pathname = '/applicant/dashboard';
