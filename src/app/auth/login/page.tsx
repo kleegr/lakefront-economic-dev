@@ -21,18 +21,42 @@ function LoginForm() {
   const handleLogin = async () => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
+      // Sign in directly with Supabase client-side — this sets session cookies automatically
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase().trim(),
+        password,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Login failed');
+      if (signInErr) {
+        setError('Invalid email or password');
         return;
       }
-      if (data.redirectTo) router.push(data.redirectTo);
-      else router.push('/portal/dashboard');
+      if (!data.user) {
+        setError('Authentication failed');
+        return;
+      }
+
+      // Get profile to determine redirect
+      const { data: profile } = await supabase
+        .from('lf_profiles')
+        .select('role, portal_type, account_status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      let redirectTo = '/applicant/dashboard';
+      if (profile) {
+        if (profile.account_status === 'suspended') {
+          await supabase.auth.signOut();
+          setError('Your account has been suspended');
+          return;
+        }
+        if (['super_admin', 'admin'].includes(profile.role)) {
+          redirectTo = '/portal/dashboard';
+        } else if (profile.portal_type === 'employer') {
+          redirectTo = '/employer/dashboard';
+        }
+      }
+
+      router.push(redirectTo);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -42,7 +66,6 @@ function LoginForm() {
   const handleForgotPassword = async () => {
     setLoading(true); setError('');
     try {
-      // Use Supabase native password reset — sends email through Supabase Auth
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
         { redirectTo: `${window.location.origin}/auth/reset-password` }
@@ -70,7 +93,7 @@ function LoginForm() {
               <div className="text-center py-6">
                 <Mail className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <h3 className="font-display font-bold text-brand-forest text-lg mb-2">Check Your Email</h3>
-                <p className="text-sm font-body text-brand-muted">If an account exists for <strong>{email}</strong>, we sent a password reset link to that email.</p>
+                <p className="text-sm font-body text-brand-muted">If an account exists for <strong>{email}</strong>, we sent a password reset link.</p>
                 <button onClick={() => { setForgotMode(false); setForgotSent(false); }} className="text-sm font-body text-brand-sage hover:text-brand-forest mt-4">&larr; Back to Login</button>
               </div>
             ) : (
