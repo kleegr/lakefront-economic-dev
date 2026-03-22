@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 
 export async function POST(request: NextRequest) {
@@ -9,8 +8,10 @@ export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  // Sign in with Supabase Auth (email+password)
-  const response = NextResponse.json({ success: true });
+  // We need to create the final response first so cookies can be set on it
+  const jsonBody = { success: true, redirectTo: '/applicant/dashboard' };
+  const response = NextResponse.json(jsonBody);
+
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() { return request.cookies.getAll(); },
@@ -27,23 +28,22 @@ export async function POST(request: NextRequest) {
     password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     return NextResponse.json({ success: false, error: 'Invalid email or password' }, { status: 401 });
   }
 
-  if (!data.user) {
-    return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 });
-  }
-
-  // Get profile to determine redirect
-  const directClient = createClient(supabaseUrl, supabaseKey);
-  const { data: profile } = await directClient.from('lf_profiles').select('role, portal_type, account_status').eq('id', data.user.id).maybeSingle();
+  // Now the supabase client has a valid session — auth.uid() works for RLS
+  const { data: profile, error: profileErr } = await supabase
+    .from('lf_profiles')
+    .select('role, portal_type, account_status')
+    .eq('id', data.user.id)
+    .maybeSingle();
 
   // Update last login
-  await directClient.from('lf_profiles').update({ last_login_at: new Date().toISOString() }).eq('id', data.user.id);
+  await supabase.from('lf_profiles').update({ last_login_at: new Date().toISOString() }).eq('id', data.user.id);
 
   // Audit log
-  await directClient.from('lf_audit_log').insert({ user_id: data.user.id, action: 'login', details: { method: 'password' } });
+  await supabase.from('lf_audit_log').insert({ user_id: data.user.id, action: 'login', details: { method: 'password' } });
 
   let redirectTo = '/applicant/dashboard';
   if (profile) {
@@ -51,12 +51,18 @@ export async function POST(request: NextRequest) {
       await supabase.auth.signOut();
       return NextResponse.json({ success: false, error: 'Your account has been suspended' }, { status: 403 });
     }
-    if (['super_admin', 'admin'].includes(profile.role)) redirectTo = '/portal/dashboard';
-    else if (profile.portal_type === 'employer') redirectTo = '/employer/dashboard';
+    if (['super_admin', 'admin'].includes(profile.role)) {
+      redirectTo = '/portal/dashboard';
+    } else if (profile.portal_type === 'employer') {
+      redirectTo = '/employer/dashboard';
+    }
   }
 
-  // Build response with session cookies
+  // Build the final response with correct redirect and session cookies
   const finalResponse = NextResponse.json({ success: true, redirectTo });
-  response.cookies.getAll().forEach(cookie => { finalResponse.cookies.set(cookie.name, cookie.value); });
+  response.cookies.getAll().forEach(cookie => {
+    finalResponse.cookies.set(cookie.name, cookie.value);
+  });
+
   return finalResponse;
 }
