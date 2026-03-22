@@ -1,13 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,10 +15,11 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
-  const supabase = createClient();
 
   const handleLogin = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
+    const supabase = createClient();
     try {
       const { data, error: signInErr } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
@@ -30,12 +30,9 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-
-      // After successful sign-in, redirect directly to portal dashboard
-      // The portal layout will handle role checking
-      // For super_admin/admin -> shows full admin portal
-      // For non-admin -> portal layout redirects to correct portal
-      window.location.href = '/portal/dashboard';
+      // Login successful — hard redirect to admin portal
+      // Do NOT call setLoading(false) — let the page navigate away
+      window.location.replace('/portal/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setLoading(false);
@@ -43,7 +40,9 @@ function LoginForm() {
   };
 
   const handleForgotPassword = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
+    const supabase = createClient();
     try {
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
@@ -107,7 +106,7 @@ function LoginForm() {
               <div className="flex justify-end">
                 <button onClick={() => setForgotMode(true)} className="text-xs font-body text-brand-sage hover:text-brand-forest">Forgot password?</button>
               </div>
-              <button onClick={handleLogin} disabled={loading || !email || !password} className="btn-primary w-full disabled:opacity-50">{loading ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4 ml-2" /></button>
+              <button onClick={handleLogin} disabled={loading || !email || !password} className="w-full py-3 bg-brand-gold text-white font-display font-bold text-sm uppercase tracking-widest rounded-sm hover:bg-brand-gold/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">{loading ? 'Signing in...' : 'SIGN IN'}</button>
               <p className="text-xs text-brand-muted font-body text-center">Access is by invitation only.</p>
             </div>
           )}
