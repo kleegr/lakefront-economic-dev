@@ -30,9 +30,34 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      // Login successful — hard redirect to admin portal
-      // Do NOT call setLoading(false) — let the page navigate away
-      window.location.replace('/portal/dashboard');
+
+      // Get profile to determine portal redirect
+      const { data: profile } = await supabase
+        .from('lf_profiles')
+        .select('role, portal_type, account_status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (profile?.account_status === 'suspended') {
+        await supabase.auth.signOut();
+        setError('Your account has been suspended');
+        setLoading(false);
+        return;
+      }
+
+      // Route based on portal_type
+      let redirectTo = '/applicant/dashboard';
+      if (profile) {
+        if (['super_admin', 'admin'].includes(profile.role)) {
+          redirectTo = '/portal/dashboard';
+        } else if (profile.portal_type === 'employer') {
+          redirectTo = '/employer/dashboard';
+        } else if (profile.portal_type === 'applicant') {
+          redirectTo = '/applicant/dashboard';
+        }
+      }
+
+      window.location.replace(redirectTo);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setLoading(false);
@@ -40,8 +65,7 @@ function LoginForm() {
   };
 
   const handleForgotPassword = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     const supabase = createClient();
     try {
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
@@ -65,7 +89,6 @@ function LoginForm() {
         </div>
         <div className="bg-white rounded-lg shadow-xl p-8">
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 font-body">{error}</div>}
-
           {forgotMode ? (
             forgotSent ? (
               <div className="text-center py-6">
@@ -82,7 +105,7 @@ function LoginForm() {
                   <Mail className="w-4 h-4 text-gray-400" />
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="flex-1 font-body text-brand-text placeholder:text-gray-400 outline-none bg-transparent" onKeyDown={e => e.key === 'Enter' && email && handleForgotPassword()} />
                 </div>
-                <button onClick={handleForgotPassword} disabled={loading || !email} className="btn-primary w-full disabled:opacity-50">{loading ? 'Sending...' : 'Send Reset Link'}</button>
+                <button onClick={handleForgotPassword} disabled={loading || !email} className="w-full py-3 bg-brand-gold text-white font-display font-bold text-sm uppercase tracking-widest rounded-sm hover:bg-brand-gold/90 transition-colors disabled:opacity-50">{loading ? 'Sending...' : 'Send Reset Link'}</button>
                 <button onClick={() => setForgotMode(false)} className="text-sm font-body text-brand-sage hover:text-brand-forest w-full text-center">&larr; Back to Login</button>
               </div>
             )
@@ -90,14 +113,14 @@ function LoginForm() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-body font-semibold text-brand-text uppercase tracking-wider block mb-1.5">Email</label>
-                <div className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-sm focus-within:ring-2 focus-within:ring-brand-sage/30 focus-within:border-brand-sage">
+                <div className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-sm focus-within:ring-2 focus-within:ring-brand-sage/30">
                   <Mail className="w-4 h-4 text-gray-400" />
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="flex-1 font-body text-brand-text placeholder:text-gray-400 outline-none bg-transparent" onKeyDown={e => e.key === 'Enter' && password && handleLogin()} />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-body font-semibold text-brand-text uppercase tracking-wider block mb-1.5">Password</label>
-                <div className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-sm focus-within:ring-2 focus-within:ring-brand-sage/30 focus-within:border-brand-sage">
+                <div className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-sm focus-within:ring-2 focus-within:ring-brand-sage/30">
                   <Lock className="w-4 h-4 text-gray-400" />
                   <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" className="flex-1 font-body text-brand-text placeholder:text-gray-400 outline-none bg-transparent" onKeyDown={e => e.key === 'Enter' && email && handleLogin()} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-gray-600">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>

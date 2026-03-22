@@ -16,7 +16,6 @@ const NAV_ITEMS = [
   { label:'Spaces', href:'/portal/spaces', icon:Warehouse },
   { label:'Content', href:'/portal/content', icon:FileEdit },
   { label:'Users & Access', href:'/portal/users', icon:Users },
-  { label:'Approvals', href:'/portal/applications', icon:ClipboardList },
   { label:'Settings', href:'/portal/settings', icon:Settings },
 ];
 
@@ -26,21 +25,25 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<{name:string;email:string;role:string}|null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     async function loadUser() {
+      const supabase = createClient();
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { router.push('/auth/login'); return; }
+      if (!authUser) { window.location.replace('/auth/login'); return; }
       const { data: profile } = await supabase.from('lf_profiles').select('full_name, email, role, portal_type, account_status').eq('id', authUser.id).maybeSingle();
-      if (!profile || !['super_admin','admin'].includes(profile.role)) { router.push('/auth/login'); return; }
+      if (!profile || !['super_admin','admin'].includes(profile.role)) {
+        // Not an admin — redirect to correct portal
+        if (profile?.portal_type === 'employer') { window.location.replace('/employer/dashboard'); return; }
+        window.location.replace('/applicant/dashboard'); return;
+      }
       setUser({ name: profile.full_name || profile.email, email: profile.email, role: profile.role === 'super_admin' ? 'Super Admin' : 'Admin' });
       setLoading(false);
     }
     loadUser();
   }, []);
 
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth/login'); };
+  const handleLogout = async () => { const supabase = createClient(); await supabase.auth.signOut(); window.location.replace('/auth/login'); };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-portal-bg"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
 
@@ -58,7 +61,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </Link>
         <nav className="flex-1 overflow-y-auto portal-scroll py-4 px-3 space-y-1">
           {NAV_ITEMS.map((item) => { const isActive = pathname.startsWith(item.href); return (
-            <Link key={item.label + item.href} href={item.href} onClick={() => setSidebarOpen(false)} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-body font-medium transition-all', isActive ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white/80')}>
+            <Link key={item.label} href={item.href} onClick={() => setSidebarOpen(false)} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-body font-medium transition-all', isActive ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white/80')}>
               <item.icon className="w-4 h-4 shrink-0" />{item.label}
             </Link>
           );})}
