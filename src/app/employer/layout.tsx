@@ -1,77 +1,80 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getUserProfile, type UserProfile } from '@/lib/auth';
-import { Building2, Briefcase, Users, Settings, LogOut, Home, AlertCircle, Clock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Settings, Globe, LogOut, Menu, Bell } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const NAV = [
-  { href: '/employer/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/employer/business', label: 'My Business', icon: Building2 },
-  { href: '/employer/jobs', label: 'Job Posts', icon: Briefcase },
-  { href: '/employer/applicants', label: 'Applicants', icon: Users },
-  { href: '/employer/settings', label: 'Settings', icon: Settings },
+const NAV_ITEMS = [
+  { label:'Dashboard', href:'/employer/dashboard', icon:LayoutDashboard },
+  { label:'My Jobs', href:'/employer/jobs', icon:Briefcase },
+  { label:'Applications', href:'/employer/applications', icon:FileText },
+  { label:'My Business', href:'/employer/business', icon:Building2 },
+  { label:'Settings', href:'/employer/settings', icon:Settings },
 ];
 
 export default function EmployerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<{name:string;email:string;role:string}|null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
-    getUserProfile(supabase).then(p => { setProfile(p); setLoading(false); });
+    async function loadUser() {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) { window.location.replace('/auth/login'); return; }
+      const { data: profile } = await supabase.from('lf_profiles').select('full_name, email, role, portal_type').eq('id', authUser.id).maybeSingle();
+      if (!profile || (profile.portal_type !== 'employer' && !['super_admin','admin'].includes(profile.role))) {
+        window.location.replace('/applicant/dashboard'); return;
+      }
+      setUser({ name: profile.full_name || profile.email, email: profile.email, role: 'Employer' });
+      setLoading(false);
+    }
+    loadUser();
   }, []);
 
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/'); };
+  const handleLogout = async () => { const supabase = createClient(); await supabase.auth.signOut(); window.location.replace('/auth/login'); };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
 
-  const isPending = profile?.account_status === 'pending';
-  const isRejected = profile?.account_status === 'rejected';
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="font-display text-lg font-bold text-brand-forest">Lakefront</Link>
-            <span className="text-xs font-body px-2 py-0.5 bg-purple-50 text-purple-700 rounded">Employer Portal</span>
-            {isPending && <span className="text-xs font-body px-2 py-0.5 bg-amber-50 text-amber-700 rounded flex items-center gap-1"><Clock className="w-3 h-3" />Pending Approval</span>}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-body text-brand-muted hidden sm:block">{profile?.company_name || profile?.email}</span>
-            <button onClick={handleLogout} className="text-xs font-body text-brand-muted hover:text-red-600 flex items-center gap-1"><LogOut className="w-3.5 h-3.5" />Logout</button>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex">
+      <aside className={cn('fixed inset-y-0 left-0 z-50 w-60 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
+        <div className="h-16 flex items-center px-5 border-b border-gray-100">
+          <Link href="/employer/dashboard" className="flex items-center gap-2">
+            <span className="font-display text-lg font-bold text-brand-forest">Lakefront</span>
+            <span className="text-[9px] font-body font-semibold tracking-[0.15em] uppercase text-brand-sage bg-brand-sage/10 px-2 py-0.5 rounded">Employer</span>
+          </Link>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6"><nav className="flex gap-1 overflow-x-auto pb-2 -mb-px">
-          {NAV.map(item => (
-            <Link key={item.href} href={item.href} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-body font-medium rounded-t transition-colors whitespace-nowrap ${pathname === item.href ? 'bg-brand-sage/10 text-brand-forest border-b-2 border-brand-sage' : 'text-brand-muted hover:text-brand-forest'}`}>
-              <item.icon className="w-3.5 h-3.5" />{item.label}
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          {NAV_ITEMS.map((item) => { const isActive = pathname.startsWith(item.href); return (
+            <Link key={item.label} href={item.href} onClick={() => setSidebarOpen(false)} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-body font-medium transition-all', isActive ? 'bg-brand-sage/10 text-brand-forest' : 'text-gray-500 hover:bg-gray-50 hover:text-brand-forest')}>
+              <item.icon className="w-4 h-4 shrink-0" />{item.label}
             </Link>
-          ))}
-        </nav></div>
-      </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {(isPending || isRejected) && (
-          <div className={`mb-6 p-4 rounded-lg border ${isRejected ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
-            <div className="flex items-start gap-3">
-              <AlertCircle className={`w-5 h-5 mt-0.5 ${isRejected ? 'text-red-500' : 'text-amber-500'}`} />
-              <div>
-                <h3 className={`font-display font-semibold text-sm ${isRejected ? 'text-red-800' : 'text-amber-800'}`}>
-                  {isPending ? 'Employer Account Pending' : 'Account Not Approved'}
-                </h3>
-                <p className="text-xs font-body text-brand-muted mt-1">
-                  {isPending ? 'Your employer account is under review. You can set up your business profile, but cannot publish job postings until approved.' : 'Your employer account was not approved.'}
-                </p>
-              </div>
-            </div>
+          );})}
+        </nav>
+        <div className="p-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-brand-sage flex items-center justify-center text-white text-xs font-bold">{user?.name?.charAt(0) || 'E'}</div>
+            <div className="min-w-0 flex-1"><p className="text-sm font-body font-medium truncate text-brand-forest">{user?.name}</p><p className="text-[10px] text-gray-400 font-body truncate">{user?.role}</p></div>
           </div>
-        )}
-        {children}
-      </main>
+          <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 mt-1 w-full text-gray-400 hover:text-red-500 transition-colors rounded-lg text-xs font-body"><LogOut className="w-3.5 h-3.5" />Sign Out</button>
+        </div>
+      </aside>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 shrink-0 sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1.5 text-gray-500"><Menu className="w-5 h-5" /></button>
+          <div />
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-xs font-body text-gray-400 hover:text-brand-forest flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> View Site</Link>
+            <button className="relative p-2 text-gray-400 hover:text-gray-600"><Bell className="w-5 h-5" /></button>
+          </div>
+        </header>
+        <main className="flex-1 p-4 lg:p-6">{children}</main>
+      </div>
     </div>
   );
 }
