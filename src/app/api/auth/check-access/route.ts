@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 // Access control: only pre-authorized emails can log in
-// Admin manages this list via the admin portal or directly in the database
 export async function POST(request: NextRequest) {
   const { email } = await request.json();
   if (!email) return NextResponse.json({ allowed: false, message: 'Email required' });
 
   const normalizedEmail = email.toLowerCase().trim();
 
-  // Check against the allowed_emails table in Supabase
-  const { createClient } = await import('@supabase/supabase-js');
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ allowed: false, message: 'Server configuration error' });
@@ -20,7 +18,7 @@ export async function POST(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   // Check if email exists in allowed list
-  const { data: allowed } = await supabase
+  const { data: allowed, error: allowedError } = await supabase
     .from('lf_allowed_emails')
     .select('*')
     .eq('email', normalizedEmail)
