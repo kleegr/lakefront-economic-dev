@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 type R = Record<string,unknown>;
 const g = (r:R,k:string):string => (r[k] as string)||'';
@@ -21,7 +21,7 @@ export default function AdminSkillsPage() {
     setName(''); setCat(''); setAdding(false); load();
   };
   const deleteSkill = async (id: string) => { await supabase.from('lf_skills').delete().eq('id', id); load(); };
-  const categories = [...new Set(skills.map(s => g(s,'category')||'General'))];
+  const categories = Array.from(new Set(skills.map(s => g(s,'category')||'General')));
 
   return (
     <div>
@@ -36,10 +36,10 @@ export default function AdminSkillsPage() {
           <button onClick={addSkill} disabled={adding||!name} className="px-4 py-2 bg-brand-forest text-white rounded text-sm font-body font-semibold disabled:opacity-50"><Plus className="w-4 h-4" /></button>
         </div>
       </div>
-      {categories.map(cat => (
-        <div key={cat} className="mb-6">
-          <h3 className="text-sm font-body font-semibold text-brand-forest mb-2">{cat}</h3>
-          <div className="flex flex-wrap gap-2">{skills.filter(s => (g(s,'category')||'General')===cat).map(sk => (
+      {categories.map(catName => (
+        <div key={catName} className="mb-6">
+          <h3 className="text-sm font-body font-semibold text-brand-forest mb-2">{catName}</h3>
+          <div className="flex flex-wrap gap-2">{skills.filter(s => (g(s,'category')||'General')===catName).map(sk => (
             <span key={g(sk,'id')} className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-body">
               {g(sk,'name')}
               <button onClick={()=>deleteSkill(g(sk,'id'))} className="text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
