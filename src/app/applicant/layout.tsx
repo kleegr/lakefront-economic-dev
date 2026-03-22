@@ -1,15 +1,11 @@
 'use client';
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Home, User, Users, FileText, Briefcase, Heart, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Home, Users, FileText, Briefcase, Heart, Settings, LogOut, User, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-type Member = { id: string; full_name: string; is_primary: boolean; profile_complete: boolean };
-type HouseholdCtx = { household: Record<string,unknown>|null; members: Member[]; activeMember: Member|null; setActiveMember: (m:Member)=>void; approved: boolean; reload: ()=>void };
-const HouseholdContext = createContext<HouseholdCtx>({ household:null, members:[], activeMember:null, setActiveMember:()=>{}, approved:false, reload:()=>{} });
-export const useHousehold = () => useContext(HouseholdContext);
+import { HouseholdContext, HouseholdMember } from '@/lib/household-context';
 
 const NAV = [
   { label:'Dashboard', href:'/applicant/dashboard', icon:Home },
@@ -25,8 +21,8 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<{name:string;email:string;id:string}|null>(null);
   const [loading, setLoading] = useState(true);
   const [household, setHousehold] = useState<Record<string,unknown>|null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [activeMember, setActiveMember] = useState<Member|null>(null);
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
+  const [activeMember, setActiveMember] = useState<HouseholdMember|null>(null);
   const [approved, setApproved] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
 
@@ -37,7 +33,6 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
     const { data: p } = await supabase.from('lf_profiles').select('*').eq('id', au.id).maybeSingle();
     setUser({ name: p?.full_name || p?.email || au.email || '', email: p?.email || au.email || '', id: au.id });
     setApproved(p?.account_status === 'approved');
-    // Load or create household
     let { data: hh } = await supabase.from('lf_households').select('*').eq('account_id', au.id).maybeSingle();
     if (!hh) {
       const { data: newHh } = await supabase.from('lf_households').insert({ account_id: au.id }).select().single();
@@ -46,7 +41,7 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
     setHousehold(hh);
     if (hh) {
       const { data: mems } = await supabase.from('lf_household_members').select('id, full_name, is_primary, profile_complete').eq('household_id', hh.id).order('is_primary', { ascending: false });
-      const m = (mems || []) as Member[];
+      const m = (mems || []) as HouseholdMember[];
       setMembers(m);
       const stored = typeof window !== 'undefined' ? localStorage.getItem('lf_active_member') : null;
       const found = stored ? m.find(x => x.id === stored) : null;
@@ -57,7 +52,7 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
 
   useEffect(() => { loadData(); }, []);
 
-  const handleSetActive = (m: Member) => { setActiveMember(m); localStorage.setItem('lf_active_member', m.id); setShowSwitcher(false); };
+  const handleSetActive = (m: HouseholdMember) => { setActiveMember(m); localStorage.setItem('lf_active_member', m.id); setShowSwitcher(false); };
   const handleLogout = async () => { const s = createClient(); await s.auth.signOut(); window.location.replace('/auth/login'); };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
@@ -72,26 +67,21 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
               <span className="text-[9px] font-body font-semibold tracking-[0.15em] uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Resident Portal</span>
             </Link>
             <div className="flex items-center gap-3">
-              {/* Member Switcher */}
               {members.length > 0 && (
                 <div className="relative">
-                  <button onClick={() => setShowSwitcher(!showSwitcher)} className="flex items-center gap-2 px-3 py-1.5 bg-brand-sage/10 rounded-lg text-xs font-body font-semibold text-brand-forest hover:bg-brand-sage/20 transition-colors">
-                    <User className="w-3.5 h-3.5" />
-                    {activeMember?.full_name || 'Select member'}
-                    <ChevronDown className="w-3 h-3" />
+                  <button onClick={() => setShowSwitcher(!showSwitcher)} className="flex items-center gap-2 px-3 py-1.5 bg-brand-sage/10 rounded-lg text-xs font-body font-semibold text-brand-forest hover:bg-brand-sage/20">
+                    <User className="w-3.5 h-3.5" />{activeMember?.full_name || 'Select member'}<ChevronDown className="w-3 h-3" />
                   </button>
                   {showSwitcher && (
                     <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[200px] z-50">
                       <div className="px-3 py-1.5 text-[10px] font-body text-gray-400 uppercase tracking-wider">Active Member</div>
                       {members.map(m => (
-                        <button key={m.id} onClick={() => handleSetActive(m)} className={cn('w-full text-left px-3 py-2 text-sm font-body flex items-center justify-between hover:bg-gray-50', m.id === activeMember?.id && 'bg-brand-sage/10 text-brand-forest font-semibold')}>
+                        <button key={m.id} onClick={() => handleSetActive(m)} className={cn('w-full text-left px-3 py-2 text-sm font-body flex items-center justify-between hover:bg-gray-50', m.id === activeMember?.id && 'bg-brand-sage/10 font-semibold')}>
                           <span>{m.full_name}{m.is_primary && ' (Primary)'}</span>
                           {m.profile_complete ? <span className="text-[10px] text-green-600">Complete</span> : <span className="text-[10px] text-amber-500">Incomplete</span>}
                         </button>
                       ))}
-                      <div className="border-t border-gray-100 mt-1 pt-1">
-                        <Link href="/applicant/household" onClick={() => setShowSwitcher(false)} className="block px-3 py-2 text-xs font-body text-brand-sage hover:bg-gray-50">+ Manage Members</Link>
-                      </div>
+                      <div className="border-t border-gray-100 mt-1 pt-1"><Link href="/applicant/household" onClick={() => setShowSwitcher(false)} className="block px-3 py-2 text-xs font-body text-brand-sage hover:bg-gray-50">+ Manage Members</Link></div>
                     </div>
                   )}
                 </div>
@@ -107,10 +97,8 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
             })}
           </nav>
         </header>
-        {/* Approval banner */}
-        {!approved && <div className="max-w-6xl mx-auto px-4 mt-4"><div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm font-body text-amber-800">Your account is pending approval. You can browse jobs and set up your household, but cannot submit applications until approved.</div></div>}
-        {/* No members banner */}
-        {members.length === 0 && <div className="max-w-6xl mx-auto px-4 mt-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm font-body text-blue-800">Set up your household and add at least one member to start applying for jobs. <Link href="/applicant/household" className="underline font-semibold">Go to Household &rarr;</Link></div></div>}
+        {!approved && <div className="max-w-6xl mx-auto px-4 mt-4"><div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm font-body text-amber-800">Your account is pending approval. You can browse and save jobs, but cannot submit applications until approved.</div></div>}
+        {members.length === 0 && <div className="max-w-6xl mx-auto px-4 mt-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm font-body text-blue-800">Add at least one household member to get started. <Link href="/applicant/household" className="underline font-semibold">Go to Household &rarr;</Link></div></div>}
         <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
       </div>
     </HouseholdContext.Provider>
