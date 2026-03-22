@@ -21,46 +21,25 @@ function LoginForm() {
   const handleLogin = async () => {
     setLoading(true); setError('');
     try {
-      // Sign in directly with Supabase client-side — this sets session cookies automatically
       const { data, error: signInErr } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
-      if (signInErr) {
+      if (signInErr || !data.user) {
         setError('Invalid email or password');
-        return;
-      }
-      if (!data.user) {
-        setError('Authentication failed');
+        setLoading(false);
         return;
       }
 
-      // Get profile to determine redirect
-      const { data: profile } = await supabase
-        .from('lf_profiles')
-        .select('role, portal_type, account_status')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      let redirectTo = '/applicant/dashboard';
-      if (profile) {
-        if (profile.account_status === 'suspended') {
-          await supabase.auth.signOut();
-          setError('Your account has been suspended');
-          return;
-        }
-        if (['super_admin', 'admin'].includes(profile.role)) {
-          redirectTo = '/portal/dashboard';
-        } else if (profile.portal_type === 'employer') {
-          redirectTo = '/employer/dashboard';
-        }
-      }
-
-      router.push(redirectTo);
-      router.refresh();
+      // After successful sign-in, redirect directly to portal dashboard
+      // The portal layout will handle role checking
+      // For super_admin/admin -> shows full admin portal
+      // For non-admin -> portal layout redirects to correct portal
+      window.location.href = '/portal/dashboard';
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
-    } finally { setLoading(false); }
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = async () => {
