@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, TrendingUp, Warehouse, FileEdit, Users, Settings, Search, Bell, Menu, Globe, LogOut, Shield, Tag } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, TrendingUp, Warehouse, FileEdit, Users, Settings, Search, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, Eye, ScrollText, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { label:'Dashboard', href:'/portal/dashboard', icon:LayoutDashboard },
+  { label:'Approvals', href:'/portal/approvals', icon:ClipboardCheck },
   { label:'Jobs', href:'/portal/jobs', icon:Briefcase },
   { label:'Applications', href:'/portal/applications', icon:FileText },
   { label:'Businesses', href:'/portal/businesses', icon:Building2 },
@@ -16,7 +17,10 @@ const NAV_ITEMS = [
   { label:'Spaces', href:'/portal/spaces', icon:Warehouse },
   { label:'Content', href:'/portal/content', icon:FileEdit },
   { label:'Users & Access', href:'/portal/users', icon:Users },
-  { label:'Skills Taxonomy', href:'/portal/skills', icon:Tag },
+  { label:'Impersonate', href:'/portal/impersonate', icon:Eye },
+  { label:'Contract Residents', href:'/portal/contracts', icon:Home },
+  { label:'Skills', href:'/portal/skills', icon:Tag },
+  { label:'Audit Log', href:'/portal/audit', icon:ScrollText },
   { label:'Settings', href:'/portal/settings', icon:Settings },
 ];
 
@@ -26,6 +30,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<{name:string;email:string;role:string}|null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     async function loadUser() {
@@ -38,6 +43,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         window.location.replace('/applicant/dashboard'); return;
       }
       setUser({ name: profile.full_name || profile.email, email: profile.email, role: profile.role === 'super_admin' ? 'Super Admin' : 'Admin' });
+      // Count pending items
+      const { count: pa } = await supabase.from('lf_profiles').select('*', { count: 'exact', head: true }).eq('account_status', 'pending');
+      const { count: pj } = await supabase.from('lf_jobs').select('*', { count: 'exact', head: true }).eq('approval_status', 'pending');
+      setPendingCount((pa||0) + (pj||0));
       setLoading(false);
     }
     loadUser();
@@ -62,7 +71,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <nav className="flex-1 overflow-y-auto portal-scroll py-4 px-3 space-y-1">
           {NAV_ITEMS.map((item) => { const isActive = pathname.startsWith(item.href); return (
             <Link key={item.label} href={item.href} onClick={() => setSidebarOpen(false)} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-body font-medium transition-all', isActive ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white/80')}>
-              <item.icon className="w-4 h-4 shrink-0" />{item.label}
+              <item.icon className="w-4 h-4 shrink-0" />
+              {item.label}
+              {item.label === 'Approvals' && pendingCount > 0 && <span className="ml-auto px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full">{pendingCount}</span>}
             </Link>
           );})}
         </nav>
@@ -82,8 +93,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <div className="hidden sm:flex items-center gap-2 bg-portal-bg rounded-lg px-3 py-2 w-72"><Search className="w-4 h-4 text-gray-400" /><input type="text" placeholder="Search..." className="bg-transparent text-sm font-body text-brand-text placeholder:text-gray-400 outline-none w-full" /></div>
           </div>
           <div className="flex items-center gap-3">
+            {pendingCount > 0 && <Link href="/portal/approvals" className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-body font-semibold"><ClipboardCheck className="w-3.5 h-3.5" />{pendingCount} pending</Link>}
             <Link href="/" className="text-xs font-body text-brand-muted hover:text-brand-forest flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> View Site</Link>
-            <button className="relative p-2 text-gray-400 hover:text-gray-600"><Bell className="w-5 h-5" /><span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" /></button>
+            <button className="relative p-2 text-gray-400 hover:text-gray-600"><Bell className="w-5 h-5" />{pendingCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />}</button>
             <div className="w-8 h-8 rounded-full bg-brand-sage flex items-center justify-center text-white text-xs font-bold">{user?.name?.charAt(0) || 'A'}</div>
           </div>
         </header>
