@@ -1,27 +1,33 @@
-// Kleegr CRM Configuration
-// All Kleegr-related settings are loaded from environment variables
-// Never hardcode API keys or sensitive data
+// GoHighLevel Configuration
+// Normalized to GHL_* convention. KLEEGR_* is deprecated.
+// All settings loaded from environment variables — never hardcode secrets.
 
-export const kleegrConfig = {
-  apiKey: process.env.KLEEGR_API_KEY || '',
-  locationId: process.env.KLEEGR_LOCATION_ID || '',
-  apiBaseUrl: process.env.KLEEGR_API_BASE_URL || 'https://services.leadconnectorhq.com',
-  webhookSecret: process.env.KLEEGR_WEBHOOK_SECRET || '',
+export const ghlConfig = {
+  token: process.env.GHL_PRIVATE_INTEGRATION_TOKEN || process.env.KLEEGR_API_KEY || '',
+  locationId: process.env.GHL_LOCATION_ID || process.env.KLEEGR_LOCATION_ID || '',
+  baseUrl: process.env.GHL_BASE_URL || process.env.KLEEGR_API_BASE_URL || 'https://services.leadconnectorhq.com',
+  webhookSecret: process.env.GHL_WEBHOOK_SECRET || process.env.KLEEGR_WEBHOOK_SECRET || '',
 
   pipelines: {
-    ats: process.env.KLEEGR_PIPELINE_ATS || '',
-    businessIntake: process.env.KLEEGR_PIPELINE_BUSINESS || '',
-    investor: process.env.KLEEGR_PIPELINE_INVESTOR || '',
-    provider: process.env.KLEEGR_PIPELINE_PROVIDER || '',
-    spaceAllocation: process.env.KLEEGR_PIPELINE_SPACE || '',
+    ats: process.env.GHL_PIPELINE_ATS || process.env.KLEEGR_PIPELINE_ATS || '',
+    businessIntake: process.env.GHL_PIPELINE_BUSINESS || process.env.KLEEGR_PIPELINE_BUSINESS || '',
+    investor: process.env.GHL_PIPELINE_INVESTOR || process.env.KLEEGR_PIPELINE_INVESTOR || '',
+    provider: process.env.GHL_PIPELINE_PROVIDER || process.env.KLEEGR_PIPELINE_PROVIDER || '',
+    spaceAllocation: process.env.GHL_PIPELINE_SPACE || process.env.KLEEGR_PIPELINE_SPACE || '',
   },
 
   customObjects: {
-    jobOpenings: process.env.KLEEGR_CO_JOBS || '',
-    spaceInventory: process.env.KLEEGR_CO_SPACES || '',
+    jobOpenings: process.env.GHL_CO_JOBS || process.env.KLEEGR_CO_JOBS || '',
+    spaceInventory: process.env.GHL_CO_SPACES || process.env.KLEEGR_CO_SPACES || '',
   },
 };
 
-export function isKleegrConfigured(): boolean {
-  return !!(kleegrConfig.apiKey && kleegrConfig.locationId);
+// Backward compat alias
+export const kleegrConfig = ghlConfig;
+
+export function isGhlConfigured(): boolean {
+  return !!(ghlConfig.token && ghlConfig.locationId);
 }
+
+// Backward compat alias
+export const isKleegrConfigured = isGhlConfigured;
