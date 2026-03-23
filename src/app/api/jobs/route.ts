@@ -65,27 +65,18 @@ export async function POST(req: NextRequest) {
   const { data: job, error } = await supabase.from('lf_jobs').insert(jobData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync to GHL
+  // Sync to GHL Custom Object
   let ghlSynced = false;
-  let ghlCompanyId: string | null = null;
   if (job) {
-    const syncResult = await syncJobToGhl({
-      id: job.id, title: job.title, company_name: job.company_name,
-      location: job.location, job_type: job.job_type, salary_range: job.salary_range,
-      category: job.category, work_mode: job.work_mode, compensation_type: job.compensation_type,
-      department: job.department, description: job.description, requirements: job.requirements,
-      benefits: job.benefits, status: job.status, visibility: job.visibility,
-      closing_date: job.closing_date, special_offer: job.special_offer, openings_count: job.openings_count,
-    });
+    const syncResult = await syncJobToGhl(job);
     ghlSynced = syncResult.success;
-    ghlCompanyId = syncResult.ghlCompanyId;
-    if (ghlSynced) {
+    if (ghlSynced && syncResult.ghlRecordId) {
       await supabase.from('lf_jobs').update({
-        ghl_record_id: ghlCompanyId,
+        ghl_record_id: syncResult.ghlRecordId,
         ghl_synced_at: new Date().toISOString(),
       }).eq('id', job.id);
     }
   }
 
-  return NextResponse.json({ job, ghlSynced, ghlCompanyId });
+  return NextResponse.json({ job, ghlSynced });
 }

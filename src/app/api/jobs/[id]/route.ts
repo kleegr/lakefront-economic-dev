@@ -42,21 +42,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { data: job, error } = await supabase.from('lf_jobs').update(updateData).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync updated job to GHL
+  // Sync to GHL Custom Object
   let ghlSynced = false;
   if (job) {
-    const syncResult = await syncJobToGhl({
-      id: job.id, title: job.title, company_name: job.company_name,
-      location: job.location, job_type: job.job_type, salary_range: job.salary_range,
-      category: job.category, work_mode: job.work_mode, compensation_type: job.compensation_type,
-      department: job.department, description: job.description, requirements: job.requirements,
-      benefits: job.benefits, status: job.status, visibility: job.visibility,
-      closing_date: job.closing_date, special_offer: job.special_offer, openings_count: job.openings_count,
-    });
+    const syncResult = await syncJobToGhl(job, job.ghl_record_id);
     ghlSynced = syncResult.success;
-    if (ghlSynced) {
+    if (ghlSynced && syncResult.ghlRecordId) {
       await supabase.from('lf_jobs').update({
-        ghl_record_id: syncResult.ghlCompanyId,
+        ghl_record_id: syncResult.ghlRecordId,
         ghl_synced_at: new Date().toISOString(),
       }).eq('id', id);
     }
