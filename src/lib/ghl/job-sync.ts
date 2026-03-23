@@ -1,12 +1,13 @@
-// GHL Job Sync — 2-way sync between Supabase lf_jobs and GHL Custom Object "Job Openings"
-// Schema key: custom_objects.job_openings
+// GHL Job Sync — 2-way sync: Supabase lf_jobs ↔ GHL Custom Object "Job Openings"
+// Schema: custom_objects.job_openings
 //
-// EXISTING GHL FIELDS (18 declared — can ONLY write to these):
-// job_title, job_code, department_category, employment_type, work_mode,
-// job_location, pay_min, pay_max, job_description, required_skills,
-// positions_available, positions_filled, opening_status,
-// resident_targeted_flag, date_posted, employer_name_snapshot,
-// company_name_display, internal_notes_summary
+// CONFIRMED WORKING FIELD KEYS:
+// job_title, company__employer, location, category, job_type, work_mode,
+// salary_range, compensation_type, department, requirements, benefits,
+// special_offer, closing_date, openings_count, supabase_id
+//
+// DROPDOWNS (lowercase values): status, visibility
+// RESERVED/BROKEN: description (use requirements to hold combined text)
 import { ghlConfig, isGhlConfigured } from './config';
 
 const SCHEMA_KEY = 'custom_objects.job_openings';
@@ -43,66 +44,65 @@ export interface JobSyncData {
   application_count?: number | null;
 }
 
-// Map portal job → GHL properties (ONLY the 18 declared fields)
+// Map Supabase job → GHL Custom Object properties (ONLY confirmed working keys)
 function jobToGhlProperties(job: JobSyncData): Record<string, any> {
-  // Pack extra fields into internal_notes_summary as structured text
-  const notesParts = [
-    `[supabase_id:${job.id}]`,
-    job.benefits ? `[benefits:${job.benefits}]` : '',
-    job.special_offer ? `[special_offer:${job.special_offer}]` : '',
-    job.compensation_type ? `[compensation_type:${job.compensation_type}]` : '',
-    job.closing_date ? `[closing_date:${job.closing_date}]` : '',
-    job.visibility ? `[visibility:${job.visibility}]` : '',
-    job.department ? `[department:${job.department}]` : '',
-    job.salary_range ? `[salary_range:${job.salary_range}]` : '',
-  ].filter(Boolean).join('\n');
-
-  return {
+  const props: Record<string, any> = {
     job_title: job.title || '',
-    company_name_display: job.company_name || '',
-    employer_name_snapshot: job.company_name || '',
-    job_location: job.location || 'Lakefront Estates, Okeechobee, FL',
-    work_mode: job.work_mode || 'on_site',
-    job_description: job.description || '',
-    required_skills: job.requirements || '',
-    positions_available: job.openings_count || 1,
-    positions_filled: job.application_count || 0,
-    date_posted: job.posted_date || '',
-    job_code: job.category || 'General',
-    internal_notes_summary: notesParts,
+    company__employer: job.company_name || '',
+    location: job.location || 'Lakefront Estates, Okeechobee, FL',
+    category: job.category || 'General',
+    job_type: (job.job_type || 'full-time').toLowerCase(),
+    work_mode: (job.work_mode || 'on_site').toLowerCase(),
+    salary_range: job.salary_range || '',
+    compensation_type: (job.compensation_type || 'salary').toLowerCase(),
+    department: job.department || '',
+    // "description" is reserved in GHL — combine description + requirements
+    requirements: [
+      job.description || '',
+      job.requirements ? '\n\n--- Requirements ---\n' + job.requirements : '',
+    ].join('').trim(),
+    benefits: job.benefits || '',
+    special_offer: job.special_offer || '',
+    closing_date: job.closing_date || '',
+    openings_count: job.openings_count || 1,
+    supabase_id: job.id,
   };
+  return props;
 }
 
-// Parse a [key:value] tag from notes
-function parseTag(notes: string, key: string): string {
-  const match = notes.match(new RegExp(`\\[${key}:([^\\]]*?)\\]`));
-  return match ? match[1] : '';
-}
-
-// Map GHL properties → Supabase job data
+// Map GHL properties → Supabase job
 export function ghlPropertiesToJob(props: Record<string, any>): Partial<JobSyncData> {
-  const notes = props.internal_notes_summary || '';
+  // Split combined requirements field back into description + requirements
+  const combined = props.requirements || '';
+  const splitIdx = combined.indexOf('\n\n--- Requirements ---\n');
+  let desc = combined;
+  let reqs = '';
+  if (splitIdx > -1) {
+    desc = combined.substring(0, splitIdx);
+    reqs = combined.substring(splitIdx + '\n\n--- Requirements ---\n'.length);
+  }
+
   return {
-    id: parseTag(notes, 'supabase_id'),
+    id: props.supabase_id || '',
     title: props.job_title || '',
-    company_name: props.company_name_display || props.employer_name_snapshot || '',
-    location: props.job_location || '',
-    description: props.job_description || '',
-    requirements: props.required_skills || '',
-    category: props.job_code || 'General',
+    company_name: props.company__employer || '',
+    location: props.location || '',
+    description: desc,
+    requirements: reqs,
+    category: props.category || 'General',
+    job_type: props.job_type || 'full-time',
     work_mode: props.work_mode || 'on_site',
-    benefits: parseTag(notes, 'benefits') || '',
-    special_offer: parseTag(notes, 'special_offer') || '',
-    compensation_type: parseTag(notes, 'compensation_type') || 'salary',
-    closing_date: parseTag(notes, 'closing_date') || undefined,
-    visibility: parseTag(notes, 'visibility') || 'public',
-    department: parseTag(notes, 'department') || '',
-    salary_range: parseTag(notes, 'salary_range') || '',
-    openings_count: props.positions_available || 1,
+    salary_range: props.salary_range || '',
+    compensation_type: props.compensation_type || 'salary',
+    department: props.department || '',
+    benefits: props.benefits || '',
+    special_offer: props.special_offer || '',
+    closing_date: props.closing_date || undefined,
+    openings_count: props.openings_count || 1,
   };
 }
 
-// Create a new Job Opening record in GHL
+// Create a new Job Opening record
 export async function createGhlJobRecord(job: JobSyncData): Promise<{ recordId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { recordId: null, success: false, error: 'GHL not configured' };
   try {
@@ -122,15 +122,14 @@ export async function createGhlJobRecord(job: JobSyncData): Promise<{ recordId: 
   }
 }
 
-// Update an existing Job Opening record in GHL
+// Update an existing Job Opening record
 export async function updateGhlJobRecord(recordId: string, job: JobSyncData): Promise<{ success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { success: false, error: 'GHL not configured' };
   try {
-    const res = await fetch(`${BASE_URL}/objects/${SCHEMA_KEY}/records/${recordId}`, {
+    const res = await fetch(`${BASE_URL}/objects/${SCHEMA_KEY}/records/${recordId}?locationId=${ghlConfig.locationId}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({
-        locationId: ghlConfig.locationId,
         properties: jobToGhlProperties(job),
       }),
     });
@@ -164,11 +163,7 @@ export async function fetchAllGhlJobs(): Promise<Array<{ id: string; properties:
     const res = await fetch(`${BASE_URL}/objects/${SCHEMA_KEY}/records/search`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({
-        locationId: ghlConfig.locationId,
-        page: 1,
-        pageLimit: 100,
-      }),
+      body: JSON.stringify({ locationId: ghlConfig.locationId, page: 1, pageLimit: 100 }),
     });
     const data = await res.json();
     return (data?.records || []).map((r: any) => ({ id: r.id, properties: r.properties }));
