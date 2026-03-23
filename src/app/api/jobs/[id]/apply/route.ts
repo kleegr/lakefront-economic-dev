@@ -11,13 +11,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
   const supabase = await createServerSupabase();
 
-  // Validate required fields
   const { firstName, lastName, email, phone, coverLetter, resumeUrl } = body;
   if (!firstName || !lastName || !email) {
     return NextResponse.json({ error: 'First name, last name, and email are required' }, { status: 400 });
   }
 
-  // Verify job exists and is published
   const { data: job } = await supabase.from('lf_jobs').select('*').eq('id', jobId).eq('status', 'published').maybeSingle();
   if (!job) return NextResponse.json({ error: 'Job not found or not accepting applications' }, { status: 404 });
 
@@ -30,13 +28,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const contactRes = await ghl.createContact({
         firstName, lastName, email, phone: phone || '',
         source: 'Lakefront Job Application',
-        customField: {
-          contact_type: 'Applicant',
-        },
+        customField: { contact_type: 'Applicant' },
       });
       ghlContactId = contactRes?.contact?.id || null;
 
-      // Step 2: Create ATS Opportunity linked to contact
+      // Step 2: Create ATS Opportunity
       if (ghlContactId && ghlConfig.pipelines.ats) {
         const oppRes = await ghl.createOpportunity({
           pipelineId: ghlConfig.pipelines.ats,
@@ -52,8 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ghlOpportunityId = oppRes?.opportunity?.id || null;
       }
     } catch (err) {
-      console.error('GHL sync failed for job application:', err);
-      // Don't fail the application if GHL sync fails
+      console.error('GHL sync failed:', err);
     }
   }
 
@@ -78,10 +73,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Failed to submit application' }, { status: 500 });
   }
 
-  // Update application count on job
-  await supabase.rpc('increment_job_application_count', { job_id_input: jobId }).catch(() => {
-    // Non-critical, ignore
-  });
+  // Update application count (non-critical)
+  try {
+    await supabase.from('lf_jobs').update({
+      application_count: (job.application_count || 0) + 1,
+    }).eq('id', jobId);
+  } catch { /* ignore */ }
 
   return NextResponse.json({
     success: true,
