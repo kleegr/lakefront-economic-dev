@@ -1,14 +1,17 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Eye, EyeOff, X, Briefcase, Building2, MapPin, DollarSign, Clock, CheckCircle, ChevronDown, Search, Filter } from 'lucide-react';
-
-const CATEGORIES = ['General', 'Retail', 'Healthcare', 'Food Service', 'Maintenance', 'Security', 'Education', 'Professional Services', 'Technology', 'Construction', 'Management', 'Marketing', 'Other'];
-const JOB_TYPES = ['full-time', 'part-time', 'contract', 'seasonal', 'internship'];
-const WORK_MODES = ['on_site', 'remote', 'hybrid'];
-const COMP_TYPES = ['salary', 'hourly', 'commission', 'base_commission', 'other'];
-const VIS_OPTIONS = [{ v: 'public', l: 'Public' }, { v: 'signed_in', l: 'Signed-in' }, { v: 'admin_only', l: 'Admin Only' }];
+import { Plus, Pencil, Trash2, Eye, EyeOff, X, Briefcase, Building2, MapPin, DollarSign, ChevronDown, Search, RefreshCw } from 'lucide-react';
+import { JOB_FIELDS, getFormFields, type JobFieldConfig } from '@/lib/ghl/job-fields-config';
 
 function fmt(s: string) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
+function getDisplayLabel(field: JobFieldConfig, value: any): string {
+  if (field.type === 'dropdown' && field.options) {
+    const opt = field.options.find(o => o.value === value);
+    return opt?.ghlLabel || fmt(String(value || ''));
+  }
+  return String(value || '—');
+}
 
 export default function AdminJobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -16,15 +19,25 @@ export default function AdminJobsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    title: '', description: '', company_name: '', location: 'Lakefront Estates, Okeechobee, FL',
-    job_type: 'full-time', salary_range: '', requirements: '', benefits: '',
-    category: 'General', compensation_type: 'salary', work_mode: 'on_site',
-    department: '', status: 'published', visibility: 'public', closing_date: '',
-    openings_count: 1, special_offer: '',
-  });
+
+  // Build form state from config
+  const formFields = getFormFields();
+  const buildEmptyForm = () => {
+    const f: Record<string, any> = {};
+    for (const field of formFields) {
+      if (field.type === 'number') f[field.key] = field.key === 'openings_count' ? 1 : 0;
+      else if (field.key === 'status') f[field.key] = 'published';
+      else if (field.key === 'visibility') f[field.key] = 'public';
+      else if (field.key === 'location') f[field.key] = 'Lakefront Estates, Okeechobee, FL';
+      else f[field.key] = '';
+    }
+    return f;
+  };
+  const [form, setForm] = useState<Record<string, any>>(buildEmptyForm());
 
   useEffect(() => { load(); }, []);
 
@@ -36,28 +49,15 @@ export default function AdminJobsPage() {
 
   function openNew() {
     setEditingJob(null);
-    setForm({
-      title: '', description: '', company_name: '', location: 'Lakefront Estates, Okeechobee, FL',
-      job_type: 'full-time', salary_range: '', requirements: '', benefits: '',
-      category: 'General', compensation_type: 'salary', work_mode: 'on_site',
-      department: '', status: 'published', visibility: 'public', closing_date: '',
-      openings_count: 1, special_offer: '',
-    });
+    setForm(buildEmptyForm());
     setShowForm(true);
   }
 
   function openEdit(job: any) {
     setEditingJob(job);
-    setForm({
-      title: job.title || '', description: job.description || '', company_name: job.company_name || '',
-      location: job.location || '', job_type: job.job_type || 'full-time',
-      salary_range: job.salary_range || '', requirements: job.requirements || '',
-      benefits: job.benefits || '', category: job.category || 'General',
-      compensation_type: job.compensation_type || 'salary', work_mode: job.work_mode || 'on_site',
-      department: job.department || '', status: job.status || 'draft',
-      visibility: job.visibility || 'public', closing_date: job.closing_date || '',
-      openings_count: job.openings_count || 1, special_offer: job.special_offer || '',
-    });
+    const f: Record<string, any> = {};
+    for (const field of formFields) f[field.key] = job[field.key] ?? '';
+    setForm(f);
     setShowForm(true);
   }
 
@@ -84,10 +84,27 @@ export default function AdminJobsPage() {
     load();
   }
 
+  async function pushAllToGhl() {
+    setSyncing(true); setSyncMsg('');
+    const res = await fetch('/api/jobs/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction: 'push' }) });
+    const data = await res.json();
+    setSyncMsg(`Pushed ${data.pushed || 0} jobs. ${data.errors?.length ? data.errors.join('; ') : 'No errors.'}`);
+    setSyncing(false); load();
+  }
+
   const filtered = jobs.filter(j => {
     if (search && !(j.title || '').toLowerCase().includes(search.toLowerCase()) && !(j.company_name || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  // Group form fields for the modal
+  const fieldGroups: Record<string, JobFieldConfig[]> = {};
+  for (const f of formFields) {
+    const g = f.group || 'other';
+    if (!fieldGroups[g]) fieldGroups[g] = [];
+    fieldGroups[g].push(f);
+  }
+  const groupLabels: Record<string, string> = { core: 'Basic Info', classification: 'Classification', details: 'Details', content: 'Content', publishing: 'Publishing', extras: 'Extras' };
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
 
@@ -99,10 +116,16 @@ export default function AdminJobsPage() {
           <h1 className="font-display text-2xl font-bold text-brand-forest">Jobs Management</h1>
           <p className="text-sm font-body text-gray-400 mt-1">{jobs.length} total jobs &middot; {jobs.filter(j => j.status === 'published').length} published</p>
         </div>
-        <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90 transition-colors">
-          <Plus className="w-4 h-4" /> New Job
-        </button>
+        <div className="flex gap-2">
+          <button onClick={pushAllToGhl} disabled={syncing} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg text-xs font-body font-semibold hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} /> Sync to GHL
+          </button>
+          <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90">
+            <Plus className="w-4 h-4" /> New Job
+          </button>
+        </div>
       </div>
+      {syncMsg && <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-body">{syncMsg}</div>}
 
       {/* Search */}
       <div className="relative">
@@ -119,7 +142,6 @@ export default function AdminJobsPage() {
           </div>
         ) : filtered.map(job => (
           <div key={job.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            {/* Job row */}
             <div className="p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-50/50 transition-colors" onClick={() => setExpandedId(expandedId === job.id ? null : job.id)}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -143,31 +165,24 @@ export default function AdminJobsPage() {
                 <ChevronDown className={`w-4 h-4 text-gray-300 transition-transform ${expandedId === job.id ? 'rotate-180' : ''}`} />
               </div>
             </div>
-
-            {/* Expanded detail */}
             {expandedId === job.id && (
               <div className="border-t border-gray-100 p-4 bg-gray-50/30 space-y-3">
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-body">
-                  <div><span className="text-gray-400 uppercase tracking-wider">Category</span><p className="text-brand-forest font-semibold mt-0.5">{job.category || '—'}</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Work Mode</span><p className="text-brand-forest font-semibold mt-0.5">{fmt(job.work_mode || '')}</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Compensation</span><p className="text-brand-forest font-semibold mt-0.5">{job.salary_range || '—'} ({fmt(job.compensation_type || '')})</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Visibility</span><p className="text-brand-forest font-semibold mt-0.5">{fmt(job.visibility || 'public')}</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Posted</span><p className="text-brand-forest font-semibold mt-0.5">{job.posted_date || job.created_at?.split('T')[0] || '—'}</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Closing</span><p className="text-brand-forest font-semibold mt-0.5">{job.closing_date || 'Open'}</p></div>
-                  <div><span className="text-gray-400 uppercase tracking-wider">Applications</span><p className="text-brand-forest font-semibold mt-0.5">{job.application_count || 0}</p></div>
+                  {formFields.filter(f => f.type !== 'textarea').map(field => (
+                    <div key={field.key}><span className="text-gray-400 uppercase tracking-wider">{field.label}</span><p className="text-brand-forest font-semibold mt-0.5">{getDisplayLabel(field, job[field.key])}</p></div>
+                  ))}
                   <div><span className="text-gray-400 uppercase tracking-wider">GHL Sync</span><p className={`font-semibold mt-0.5 ${job.ghl_synced_at ? 'text-blue-600' : 'text-gray-400'}`}>{job.ghl_synced_at ? 'Synced' : 'Not synced'}</p></div>
                 </div>
                 {job.description && <div><span className="text-xs text-gray-400 uppercase tracking-wider font-body">Description</span><p className="text-sm text-gray-600 font-body mt-1 whitespace-pre-wrap">{job.description}</p></div>}
                 {job.requirements && <div><span className="text-xs text-gray-400 uppercase tracking-wider font-body">Requirements</span><p className="text-sm text-gray-600 font-body mt-1 whitespace-pre-wrap">{job.requirements}</p></div>}
                 {job.benefits && <div><span className="text-xs text-gray-400 uppercase tracking-wider font-body">Benefits</span><p className="text-sm text-gray-600 font-body mt-1 whitespace-pre-wrap">{job.benefits}</p></div>}
-                {job.special_offer && <div><span className="text-xs text-gray-400 uppercase tracking-wider font-body">Special Offer</span><p className="text-sm text-gray-600 font-body mt-1">{job.special_offer}</p></div>}
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal — auto-generated from JOB_FIELDS config */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 bg-black/50 backdrop-blur-sm" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -175,32 +190,66 @@ export default function AdminJobsPage() {
               <h2 className="font-display text-lg font-semibold text-brand-forest">{editingJob ? 'Edit Job' : 'Create New Job'}</h2>
               <button onClick={() => setShowForm(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={saveJob} className="p-5 space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2"><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Job Title *</label><input required value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="input-portal" placeholder="e.g. Store Manager" /></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Company / Employer</label><input value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} className="input-portal" placeholder="e.g. Lakefront Grocery" /></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Location</label><input value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="input-portal" /></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Category</label><select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="input-portal">{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Job Type</label><select value={form.job_type} onChange={e => setForm({...form, job_type: e.target.value})} className="input-portal">{JOB_TYPES.map(t => <option key={t} value={t}>{fmt(t)}</option>)}</select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Work Mode</label><select value={form.work_mode} onChange={e => setForm({...form, work_mode: e.target.value})} className="input-portal">{WORK_MODES.map(m => <option key={m} value={m}>{fmt(m)}</option>)}</select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Compensation Type</label><select value={form.compensation_type} onChange={e => setForm({...form, compensation_type: e.target.value})} className="input-portal">{COMP_TYPES.map(c => <option key={c} value={c}>{fmt(c)}</option>)}</select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Salary / Pay Range</label><input value={form.salary_range} onChange={e => setForm({...form, salary_range: e.target.value})} className="input-portal" placeholder="e.g. $45,000-$55,000/year" /></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Department</label><input value={form.department} onChange={e => setForm({...form, department: e.target.value})} className="input-portal" placeholder="Optional" /></div>
-              </div>
-              <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Description</label><textarea rows={4} value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input-portal resize-none" placeholder="Describe the role..." /></div>
-              <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Requirements</label><textarea rows={3} value={form.requirements} onChange={e => setForm({...form, requirements: e.target.value})} className="input-portal resize-none" placeholder="Skills, experience, qualifications..." /></div>
-              <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Benefits</label><textarea rows={2} value={form.benefits} onChange={e => setForm({...form, benefits: e.target.value})} className="input-portal resize-none" placeholder="Health insurance, PTO, etc..." /></div>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Status</label><select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="input-portal"><option value="draft">Draft</option><option value="published">Published</option></select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Visibility</label><select value={form.visibility} onChange={e => setForm({...form, visibility: e.target.value})} className="input-portal">{VIS_OPTIONS.map(v => <option key={v.v} value={v.v}>{v.l}</option>)}</select></div>
-                <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Closing Date</label><input type="date" value={form.closing_date} onChange={e => setForm({...form, closing_date: e.target.value})} className="input-portal" /></div>
-              </div>
-              <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Special Offer (optional)</label><input value={form.special_offer} onChange={e => setForm({...form, special_offer: e.target.value})} className="input-portal" placeholder="e.g. Signing bonus, relocation help" /></div>
+            <form onSubmit={saveJob} className="p-5 space-y-5">
+              {Object.entries(fieldGroups).map(([groupKey, fields]) => (
+                <div key={groupKey}>
+                  <p className="text-[10px] font-body font-semibold uppercase tracking-[0.15em] text-gray-300 mb-2">{groupLabels[groupKey] || groupKey}</p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {fields.map(field => (
+                      <div key={field.key} className={field.colSpan === 2 ? 'sm:col-span-2' : ''}>
+                        <label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">{field.label}{field.required ? ' *' : ''}</label>
+                        {field.type === 'dropdown' ? (
+                          <select
+                            value={form[field.key] || ''}
+                            onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                            className="input-portal"
+                          >
+                            <option value="">Select...</option>
+                            {field.options?.map(opt => <option key={opt.value} value={opt.value}>{opt.ghlLabel}</option>)}
+                          </select>
+                        ) : field.type === 'textarea' ? (
+                          <textarea
+                            rows={3}
+                            value={form[field.key] || ''}
+                            onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                            className="input-portal resize-none"
+                            placeholder={field.placeholder}
+                          />
+                        ) : field.type === 'date' ? (
+                          <input
+                            type="date"
+                            value={form[field.key] || ''}
+                            onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                            className="input-portal"
+                          />
+                        ) : field.type === 'number' ? (
+                          <input
+                            type="number"
+                            value={form[field.key] || ''}
+                            onChange={e => setForm({ ...form, [field.key]: parseInt(e.target.value) || 0 })}
+                            className="input-portal"
+                            placeholder={field.placeholder}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            required={field.required}
+                            value={form[field.key] || ''}
+                            onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                            className="input-portal"
+                            placeholder={field.placeholder}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving} className="px-6 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90 disabled:opacity-50 transition-colors">
+                <button type="submit" disabled={saving} className="px-6 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90 disabled:opacity-50">
                   {saving ? 'Saving...' : editingJob ? 'Update Job' : 'Create Job'}
                 </button>
-                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-200 text-gray-500 rounded-lg text-sm font-body hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-200 text-gray-500 rounded-lg text-sm font-body hover:bg-gray-50">Cancel</button>
               </div>
             </form>
           </div>
