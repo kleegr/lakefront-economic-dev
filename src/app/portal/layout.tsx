@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, FileEdit, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, Eye, ScrollText, Home, MessageSquare, Store, Key, Monitor } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, FileEdit, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, Eye, ScrollText, Home, MessageSquare, Store, Key, Monitor, Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { label:'Contract Residents', href:'/portal/contracts', icon:Home },
   { label:'Skills', href:'/portal/skills', icon:Tag },
   { label:'AI Settings', href:'/portal/ai-settings', icon:Key },
+  { label:'GHL Setup', href:'/portal/ghl-setup', icon:Plug },
   { label:'Audit Log', href:'/portal/audit', icon:ScrollText },
   { label:'Settings', href:'/portal/settings', icon:Settings },
 ];
