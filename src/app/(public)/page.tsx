@@ -1,43 +1,78 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Briefcase, Building2, Store, TrendingUp, MapPin, ArrowRight, ShieldCheck, Sun, DollarSign, GraduationCap, Heart, Stethoscope, ShoppingBag, Users, Wrench, AlertCircle } from 'lucide-react';
+import { Briefcase, Building2, Store, TrendingUp, MapPin, ArrowRight, ShieldCheck, Sun, DollarSign, GraduationCap, Heart, Stethoscope, ShoppingBag, Users, Wrench, AlertCircle, ArrowDown } from 'lucide-react';
 import { mockJobs, mockSpaces, businessOpportunities, serviceOpportunities } from '@/lib/mock-data';
 import { formatSalary, formatEnum } from '@/lib/utils';
+import { ScrollReveal } from '@/components/public/ScrollReveal';
 
-// Luxury high-class professional business images — NO PEOPLE
 const HERO_IMAGES = [
-  'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80', // modern luxury office lobby
-  'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1920&q=80', // executive boardroom glass
-  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80', // glass skyscraper looking up
-  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1920&q=80', // modern corporate campus
-  'https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=1920&q=80', // luxury office building exterior
+  'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80',
+  'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1920&q=80',
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80',
+  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1920&q=80',
+  'https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=1920&q=80',
 ];
 
 function HeroBanner() {
   const [current, setCurrent] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setCurrent(prev => (prev + 1) % HERO_IMAGES.length), 15000);
+    const timer = setInterval(() => setCurrent(prev => (prev + 1) % HERO_IMAGES.length), 12000);
     return () => clearInterval(timer);
   }, []);
   return (
     <>
       {HERO_IMAGES.map((img, i) => (
-        <div
-          key={i}
-          className={`absolute inset-0 transition-opacity duration-[3000ms] ease-in-out ${i === current ? 'opacity-30' : 'opacity-0'}`}
-        >
-          <div
-            className="absolute inset-[-10%] bg-cover bg-center"
-            style={{
-              backgroundImage: `url(${img})`,
-              animation: `panImage${i % 3} 30s ease-in-out infinite`,
-            }}
-          />
+        <div key={i} className={`absolute inset-0 transition-opacity duration-[2500ms] ease-in-out ${i === current ? 'opacity-25' : 'opacity-0'}`}>
+          <div className="absolute inset-[-10%] bg-cover bg-center" style={{ backgroundImage: `url(${img})`, animation: `panImage${i % 3} 25s ease-in-out infinite` }} />
         </div>
       ))}
     </>
   );
+}
+
+function useParallax(speed = 0.3) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const rect = el.getBoundingClientRect();
+      const offset = (rect.top - window.innerHeight / 2) * speed;
+      el.style.transform = `translateY(${offset}px)`;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [speed]);
+  return ref;
+}
+
+function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        let start = 0;
+        const duration = 1500;
+        const startTime = performance.now();
+        const animate = (now: number) => {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setCount(Math.round(eased * value));
+          if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+        observer.unobserve(el);
+      }
+    }, { threshold: 0.5 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value]);
+  return <span ref={ref}>{count}{suffix}</span>;
 }
 
 export default function HomePage() {
@@ -45,110 +80,275 @@ export default function HomePage() {
   const availableBiz = businessOpportunities.filter(b => b.status === 'available').length;
   const neededSvc = serviceOpportunities.filter(s => s.status === 'needed' || s.status === 'partial').length;
   const [heroIdx, setHeroIdx] = useState(0);
+  const parallaxRef = useParallax(0.15);
+
   useEffect(() => {
-    const t = setInterval(() => setHeroIdx(p => (p + 1) % 5), 15000);
+    const t = setInterval(() => setHeroIdx(p => (p + 1) % 5), 12000);
     return () => clearInterval(t);
   }, []);
 
   return (<>
-    {/* HERO with moving panning background */}
+    {/* ===== HERO ===== */}
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-brand-forest" />
+      <div className="absolute inset-0 bg-[#1a2a1c]" />
       <HeroBanner />
-      <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/60 via-brand-forest/30 to-brand-dark/70" />
-      <div className="relative max-container section-padding w-full text-center py-40">
-        <img src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-light-large-no-bg-scaled.png" alt="Lakefront Estates" className="h-16 lg:h-24 w-auto mx-auto mb-8 animate-fade-in opacity-0 stagger-1" />
-        <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-white leading-tight mb-6 animate-fade-in-up opacity-0 stagger-2">Welcome to Lakefront Estates<br/><span className="text-brand-gold">Economic Development</span></h1>
-        <p className="text-lg text-white/50 font-body leading-relaxed mb-10 max-w-xl mx-auto animate-fade-in-up opacity-0 stagger-3">A vibrant community with strong values. Explore jobs, business opportunities, and investment in the growing Lakefront Economy.</p>
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1a2a1c]/70 via-transparent to-[#1a2a1c]/80" />
+
+      <div ref={parallaxRef} className="relative max-container section-padding w-full text-center py-40 parallax-slow">
+        {/* Logo */}
+        <div className="mb-10 animate-fade-in opacity-0 stagger-1">
+          <img src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-light-large-no-bg-scaled.png" alt="Lakefront Estates" className="h-14 lg:h-20 w-auto mx-auto" />
+        </div>
+
+        <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.8rem] font-bold text-white leading-[1.08] mb-6 animate-fade-in-up opacity-0 stagger-2">
+          Welcome to Lakefront Estates
+          <br />
+          <span style={{ color: '#C9B97A' }}>Economic Development</span>
+        </h1>
+
+        <p className="text-lg text-white/45 font-body leading-relaxed mb-12 max-w-xl mx-auto animate-fade-in-up opacity-0 stagger-3">
+          A vibrant community with strong values. Explore jobs, business opportunities, and investment in the growing Lakefront Economy.
+        </p>
+
         <div className="flex flex-wrap justify-center gap-4 animate-fade-in-up opacity-0 stagger-4">
-          <Link href="/about" className="inline-flex items-center justify-center px-8 py-3.5 border border-white/20 text-white font-body font-medium text-sm tracking-wider uppercase rounded-sm transition-all duration-300 hover:bg-white/10 hover:border-white/40">About Us</Link>
-          <Link href="/apply" className="btn-primary">Apply Now</Link>
-        </div>
-        <div className="flex justify-center gap-2 mt-12">
-          {[0,1,2,3,4].map(i => (<span key={i} className={`h-2 rounded-full transition-all duration-700 ${i === heroIdx ? 'bg-brand-gold w-8' : 'bg-white/30 w-2'}`} />))}
-        </div>
-      </div>
-    </section>
-
-    {/* STATS BAR */}
-    <section className="py-5 bg-brand-dark"><div className="max-container section-padding">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[{value:mockJobs.length+'+',label:'Open Jobs',icon:Briefcase,href:'/jobs'},{value:availableBiz+'',label:'Businesses Available',icon:Store,href:'/businesses'},{value:neededSvc+'',label:'Services Needed',icon:Wrench,href:'/services'},{value:mockSpaces.length+'',label:'Spaces Available',icon:Building2,href:'/commercial'}].map(s => (
-          <Link key={s.label} href={s.href} className="flex items-center gap-3 py-4 px-2 group">
-            <s.icon className="w-5 h-5 text-brand-gold shrink-0" />
-            <div><div className="text-xl font-display font-bold text-white">{s.value}</div><div className="text-[11px] font-body text-white/40 uppercase tracking-wider group-hover:text-brand-gold transition-colors">{s.label}</div></div>
+          <Link href="/about" className="group inline-flex items-center justify-center px-8 py-3.5 border border-white/20 text-white font-body font-medium text-sm tracking-wider uppercase rounded-full transition-all duration-400 hover:bg-white/10 hover:border-white/40 hover:tracking-[0.2em] btn-magnetic">
+            About Us
           </Link>
-        ))}
-      </div>
-    </div></section>
+          <Link href="/apply" className="group inline-flex items-center justify-center px-8 py-3.5 text-white font-body font-semibold text-sm tracking-wider uppercase rounded-full transition-all duration-400 hover:shadow-lg hover:shadow-[#C9B97A]/30 hover:tracking-[0.2em] btn-magnetic" style={{ backgroundColor: '#C9B97A' }}>
+            Apply Now
+            <ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
+          </Link>
+        </div>
 
-    {/* ABOUT */}
-    <section className="py-20 lg:py-28 bg-white">
-      <div className="max-container section-padding"><div className="grid lg:grid-cols-2 gap-16 items-center">
-        <div>
-          <p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-4">Lakefront Economy</p>
-          <h2 className="font-display text-3xl lg:text-4xl font-bold text-brand-forest mb-6">A Complete Economic Ecosystem</h2>
-          <p className="text-base text-brand-text/60 font-body leading-relaxed mb-4">Located on 550 acres in Okeechobee, Florida, Lakefront Estates is building more than homes &mdash; it&apos;s building a complete economy. Local businesses, essential services, career opportunities, and investment prospects all in one community.</p>
-          <p className="text-base text-brand-text/60 font-body leading-relaxed mb-8">Less than an hour and a half from Boca, Palm Beach, and Orlando, the Lakefront Economy offers unique opportunities for entrepreneurs, service providers, and investors.</p>
-          <Link href="/about" className="btn-primary text-xs">Learn More <ArrowRight className="w-4 h-4 ml-2" /></Link>
+        {/* Dots */}
+        <div className="flex justify-center gap-2 mt-14">
+          {Array.from({length: 5}).map((_, i) => (
+            <span key={i} className={`h-1.5 rounded-full transition-all duration-700 ${i === heroIdx ? 'w-8' : 'w-1.5 bg-white/25'}`} style={i === heroIdx ? { backgroundColor: '#C9B97A' } : {}} />
+          ))}
         </div>
-        <div className="relative rounded-sm overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80" alt="Luxury modern office interior" className="w-full h-80 lg:h-96 object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-brand-forest/30 to-transparent" />
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce">
+          <ArrowDown className="w-5 h-5 text-white/30" />
         </div>
-      </div></div>
+      </div>
     </section>
 
-    {/* BUSINESS OPPORTUNITIES */}
-    <section className="py-16 lg:py-20 bg-brand-cream">
+    {/* ===== STATS BAR ===== */}
+    <section className="py-6" style={{ background: 'linear-gradient(135deg, #1a2a1c 0%, #2C3E2D 100%)' }}>
       <div className="max-container section-padding">
-        <div className="flex items-end justify-between mb-10"><div><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-3">Lakefront Economy</p><h2 className="font-display text-2xl lg:text-3xl font-bold text-brand-forest">Essential Businesses Needed</h2><p className="text-sm text-brand-muted font-body mt-2"><span className="font-semibold text-green-600">{availableBiz} opportunities</span> available for entrepreneurs</p></div><Link href="/businesses" className="hidden sm:flex items-center gap-1 text-sm font-body font-semibold text-brand-sage hover:text-brand-forest transition-colors">View All <ArrowRight className="w-3.5 h-3.5" /></Link></div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {businessOpportunities.filter(b => b.status === 'available').slice(0,4).map(biz => (
-            <div key={biz.id} className="bg-white rounded-sm border border-green-200 p-5 hover:shadow-md transition-all"><h3 className="font-display text-base font-semibold text-brand-forest mb-1">{biz.name}</h3><p className="text-xs text-brand-gold font-body uppercase tracking-wider mb-2">{biz.category}</p><p className="text-sm text-brand-muted font-body line-clamp-2 mb-3">{biz.description}</p><Link href="/apply?type=business" className="text-xs font-body font-semibold text-brand-gold hover:text-brand-sage flex items-center gap-1">Apply <ArrowRight className="w-3 h-3" /></Link></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[
+            { value: mockJobs.length, suffix: '+', label: 'Open Jobs', icon: Briefcase, href: '/jobs' },
+            { value: availableBiz, suffix: '', label: 'Businesses Available', icon: Store, href: '/businesses' },
+            { value: neededSvc, suffix: '', label: 'Services Needed', icon: Wrench, href: '/services' },
+            { value: mockSpaces.length, suffix: '', label: 'Spaces Available', icon: Building2, href: '/commercial' },
+          ].map(s => (
+            <Link key={s.label} href={s.href} className="flex items-center gap-3 py-3 px-2 group">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-white/10" style={{ background: 'rgba(201,185,122,0.15)' }}>
+                <s.icon className="w-4 h-4" style={{ color: '#C9B97A' }} />
+              </div>
+              <div>
+                <div className="text-2xl font-display font-bold text-white">
+                  <AnimatedCounter value={s.value} suffix={s.suffix} />
+                </div>
+                <div className="text-[10px] font-body text-white/35 uppercase tracking-wider group-hover:text-[#C9B97A] transition-colors duration-300">{s.label}</div>
+              </div>
+            </Link>
           ))}
         </div>
       </div>
     </section>
 
-    {/* FEATURED JOBS */}
-    <section className="py-20 lg:py-28 bg-white">
+    {/* ===== ABOUT ===== */}
+    <section className="py-24 lg:py-32 bg-[#FAFAF7]">
       <div className="max-container section-padding">
-        <div className="text-center mb-14"><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-3">Careers</p><h2 className="font-display text-3xl lg:text-4xl font-bold text-brand-forest">Open Positions</h2><p className="text-base text-brand-muted font-body mt-3 max-w-lg mx-auto">Find your next career in the Lakefront Economy.</p></div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">{featuredJobs.map(job => (
-          <Link key={job.id} href={`/jobs/${job.id}`} className="card-public p-6 group">
-            <div className="flex items-start justify-between mb-4"><span className="px-3 py-1 bg-brand-sage/10 text-brand-sage text-xs font-body font-semibold rounded-sm">{formatEnum(job.type)}</span></div>
-            <h3 className="font-display text-lg font-semibold text-brand-forest mb-2 group-hover:text-brand-sage transition-colors">{job.title}</h3>
-            <p className="text-sm text-brand-muted font-body mb-1">{job.employerName}</p>
-            <div className="flex items-center gap-1 text-sm text-brand-muted font-body mb-4"><MapPin className="w-3.5 h-3.5" />{job.location}</div>
-            <div className="pt-4 border-t border-gray-100"><span className="text-sm font-body font-semibold text-brand-forest">{formatSalary(job.salaryMin, job.salaryMax, job.salaryType)}</span></div>
-          </Link>
-        ))}</div>
-        <div className="text-center mt-10"><Link href="/jobs" className="btn-secondary text-xs">View All Jobs <ArrowRight className="w-4 h-4 ml-2" /></Link></div>
+        <div className="grid lg:grid-cols-2 gap-20 items-center">
+          <ScrollReveal variant="left">
+            <p className="text-xs tracking-[0.3em] uppercase mb-4 font-body font-semibold" style={{ color: '#C9B97A' }}>Lakefront Economy</p>
+            <h2 className="font-display text-3xl lg:text-[2.5rem] font-bold leading-tight mb-6" style={{ color: '#2C3E2D' }}>
+              A Complete Economic<br />Ecosystem
+            </h2>
+            <div className="w-12 h-[2px] mb-8" style={{ backgroundColor: '#C9B97A' }} />
+            <p className="text-base text-gray-500 font-body leading-[1.85] mb-4">Located on 550 acres in Okeechobee, Florida, Lakefront Estates is building more than homes &mdash; it&apos;s building a complete economy. Local businesses, essential services, career opportunities, and investment prospects all in one community.</p>
+            <p className="text-base text-gray-500 font-body leading-[1.85] mb-10">Less than an hour and a half from Boca, Palm Beach, and Orlando, the Lakefront Economy offers unique opportunities for entrepreneurs, service providers, and investors.</p>
+            <Link href="/about" className="group inline-flex items-center gap-2 text-sm font-body font-semibold tracking-wider uppercase transition-all duration-300 btn-magnetic" style={{ color: '#2C3E2D' }}>
+              Learn More
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+              <span className="block h-[1px] flex-1 transition-all duration-300 group-hover:w-8 w-0" style={{ backgroundColor: '#C9B97A' }} />
+            </Link>
+          </ScrollReveal>
+
+          <ScrollReveal variant="right">
+            <div className="relative group">
+              <div className="overflow-hidden rounded-2xl">
+                <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80" alt="Luxury modern office interior" className="w-full h-80 lg:h-[440px] object-cover transition-transform duration-700 group-hover:scale-105" />
+              </div>
+              <div className="absolute -bottom-4 -right-4 w-32 h-32 rounded-2xl flex items-center justify-center" style={{ backgroundColor: '#2C3E2D' }}>
+                <div className="text-center">
+                  <span className="block text-2xl font-display font-bold text-white">550</span>
+                  <span className="block text-[9px] uppercase tracking-widest font-body" style={{ color: '#C9B97A' }}>Acres</span>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
       </div>
     </section>
 
-    {/* SERVICES NEEDED */}
-    <section className="py-16 bg-brand-warm"><div className="max-container section-padding">
-      <div className="flex items-end justify-between mb-10"><div><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-3">Lakefront Economy</p><h2 className="font-display text-2xl lg:text-3xl font-bold text-brand-forest">Service Providers Needed</h2><p className="text-sm text-brand-muted font-body mt-2"><span className="font-semibold text-red-600">{neededSvc} services</span> still looking for providers</p></div><Link href="/services" className="hidden sm:flex items-center gap-1 text-sm font-body font-semibold text-brand-sage hover:text-brand-forest transition-colors">View All <ArrowRight className="w-3.5 h-3.5" /></Link></div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {serviceOpportunities.filter(s => s.status === 'needed').slice(0,4).map(svc => (
-          <div key={svc.id} className="bg-white rounded-sm border border-gray-100 p-5 hover:shadow-md hover:border-red-200 transition-all"><div className="flex items-center gap-2 mb-2"><AlertCircle className="w-4 h-4 text-red-500" /><span className="text-[11px] font-body font-semibold text-red-600 uppercase tracking-wider">Needed</span></div><h3 className="font-display text-base font-semibold text-brand-forest mb-1">{svc.name}</h3><p className="text-xs text-brand-muted font-body mb-3">{svc.category}</p><Link href="/apply?type=provider" className="text-xs font-body font-semibold text-brand-gold hover:text-brand-sage flex items-center gap-1">Apply <ArrowRight className="w-3 h-3" /></Link></div>
-        ))}
+    {/* ===== BUSINESS OPPORTUNITIES ===== */}
+    <section className="py-20 lg:py-24" style={{ backgroundColor: '#F5F4EF' }}>
+      <div className="max-container section-padding">
+        <ScrollReveal>
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <p className="text-xs tracking-[0.3em] uppercase mb-3 font-body font-semibold" style={{ color: '#C9B97A' }}>Lakefront Economy</p>
+              <h2 className="font-display text-2xl lg:text-3xl font-bold" style={{ color: '#2C3E2D' }}>Essential Businesses Needed</h2>
+              <p className="text-sm text-gray-400 font-body mt-2"><span className="font-semibold text-green-600">{availableBiz} opportunities</span> available for entrepreneurs</p>
+            </div>
+            <Link href="/businesses" className="hidden sm:flex items-center gap-1.5 text-sm font-body font-semibold transition-colors duration-300 hover:gap-2.5" style={{ color: '#2C3E2D' }}>View All <ArrowRight className="w-3.5 h-3.5" /></Link>
+          </div>
+        </ScrollReveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {businessOpportunities.filter(b => b.status === 'available').slice(0,4).map((biz, i) => (
+            <ScrollReveal key={biz.id} delay={i * 100}>
+              <div className="bg-white rounded-xl border border-gray-100/80 p-6 hover-lift group">
+                <h3 className="font-display text-base font-semibold mb-1 transition-colors duration-300 group-hover:text-[#C9B97A]" style={{ color: '#2C3E2D' }}>{biz.name}</h3>
+                <p className="text-[11px] uppercase tracking-wider mb-3 font-body" style={{ color: '#C9B97A' }}>{biz.category}</p>
+                <p className="text-sm text-gray-400 font-body line-clamp-2 mb-4">{biz.description}</p>
+                <Link href="/apply?type=business" className="inline-flex items-center gap-1 text-xs font-body font-semibold transition-all duration-300 group-hover:gap-2" style={{ color: '#C9B97A' }}>
+                  Apply <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
       </div>
-    </div></section>
+    </section>
 
-    {/* SPACES */}
-    <section className="py-20 lg:py-28 bg-brand-forest relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80')] bg-cover bg-center opacity-10" />
+    {/* ===== FEATURED JOBS ===== */}
+    <section className="py-24 lg:py-32 bg-white">
+      <div className="max-container section-padding">
+        <ScrollReveal>
+          <div className="text-center mb-16">
+            <p className="text-xs tracking-[0.3em] uppercase mb-3 font-body font-semibold" style={{ color: '#C9B97A' }}>Careers</p>
+            <h2 className="font-display text-3xl lg:text-4xl font-bold" style={{ color: '#2C3E2D' }}>Open Positions</h2>
+            <div className="w-12 h-[2px] mx-auto mt-4" style={{ backgroundColor: '#C9B97A' }} />
+            <p className="text-base text-gray-400 font-body mt-4 max-w-lg mx-auto">Find your next career in the Lakefront Economy.</p>
+          </div>
+        </ScrollReveal>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {featuredJobs.map((job, i) => (
+            <ScrollReveal key={job.id} delay={i * 120}>
+              <Link href={`/jobs/${job.id}`} className="block bg-white rounded-xl border border-gray-100 p-6 hover-lift group">
+                <div className="flex items-start justify-between mb-4">
+                  <span className="px-3 py-1 rounded-full text-xs font-body font-semibold" style={{ backgroundColor: 'rgba(44,62,45,0.08)', color: '#2C3E2D' }}>{formatEnum(job.type)}</span>
+                </div>
+                <h3 className="font-display text-lg font-semibold mb-2 transition-colors duration-300 group-hover:text-[#C9B97A]" style={{ color: '#2C3E2D' }}>{job.title}</h3>
+                <p className="text-sm text-gray-400 font-body mb-1">{job.employerName}</p>
+                <div className="flex items-center gap-1 text-sm text-gray-400 font-body mb-4"><MapPin className="w-3.5 h-3.5" />{job.location}</div>
+                <div className="pt-4 border-t border-gray-50">
+                  <span className="text-sm font-body font-semibold" style={{ color: '#2C3E2D' }}>{formatSalary(job.salaryMin, job.salaryMax, job.salaryType)}</span>
+                </div>
+              </Link>
+            </ScrollReveal>
+          ))}
+        </div>
+        <ScrollReveal>
+          <div className="text-center mt-12">
+            <Link href="/jobs" className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-sm font-body font-semibold tracking-wider uppercase transition-all duration-300 btn-magnetic" style={{ border: '2px solid #2C3E2D', color: '#2C3E2D' }}>
+              View All Jobs <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </ScrollReveal>
+      </div>
+    </section>
+
+    {/* ===== SERVICES NEEDED ===== */}
+    <section className="py-20 bg-[#FAFAF7]">
+      <div className="max-container section-padding">
+        <ScrollReveal>
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <p className="text-xs tracking-[0.3em] uppercase mb-3 font-body font-semibold" style={{ color: '#C9B97A' }}>Lakefront Economy</p>
+              <h2 className="font-display text-2xl lg:text-3xl font-bold" style={{ color: '#2C3E2D' }}>Service Providers Needed</h2>
+              <p className="text-sm text-gray-400 font-body mt-2"><span className="font-semibold text-red-500">{neededSvc} services</span> still looking for providers</p>
+            </div>
+            <Link href="/services" className="hidden sm:flex items-center gap-1.5 text-sm font-body font-semibold transition-all duration-300 hover:gap-2.5" style={{ color: '#2C3E2D' }}>View All <ArrowRight className="w-3.5 h-3.5" /></Link>
+          </div>
+        </ScrollReveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {serviceOpportunities.filter(s => s.status === 'needed').slice(0,4).map((svc, i) => (
+            <ScrollReveal key={svc.id} delay={i * 100}>
+              <div className="bg-white rounded-xl border border-gray-100/80 p-6 hover-lift group">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                  <span className="text-[10px] font-body font-semibold text-red-500 uppercase tracking-wider">Needed</span>
+                </div>
+                <h3 className="font-display text-base font-semibold mb-1 transition-colors duration-300 group-hover:text-[#C9B97A]" style={{ color: '#2C3E2D' }}>{svc.name}</h3>
+                <p className="text-xs text-gray-400 font-body mb-4">{svc.category}</p>
+                <Link href="/apply?type=provider" className="inline-flex items-center gap-1 text-xs font-body font-semibold transition-all duration-300 group-hover:gap-2" style={{ color: '#C9B97A' }}>Apply <ArrowRight className="w-3 h-3" /></Link>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* ===== SPACES ===== */}
+    <section className="py-24 lg:py-32 relative overflow-hidden" style={{ backgroundColor: '#2C3E2D' }}>
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80')] bg-cover bg-center opacity-[0.07]" />
       <div className="relative max-container section-padding">
-        <div className="text-center mb-14"><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-3">Lakefront Economy</p><h2 className="font-display text-3xl lg:text-4xl font-bold text-white">Available Spaces</h2></div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">{mockSpaces.map(space => (<div key={space.id} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-sm p-6 hover:bg-white/10 transition-all duration-300"><div className="flex items-center justify-between mb-4"><span className="px-2 py-0.5 bg-brand-gold/20 text-brand-gold text-[11px] font-body font-semibold rounded-sm uppercase">{space.type}</span></div><h3 className="font-display text-base font-semibold text-white mb-2">{space.name}</h3><p className="text-sm text-white/40 font-body mb-4 line-clamp-2">{space.description}</p><div className="flex items-center justify-between pt-4 border-t border-white/10"><span className="text-sm font-body text-white/50">{space.sqft.toLocaleString()} sqft</span>{space.monthlyRate && <span className="text-sm font-body font-semibold text-brand-gold">${space.monthlyRate.toLocaleString()}/mo</span>}</div></div>))}</div>
-        <div className="text-center mt-10"><Link href="/commercial" className="btn-primary">View All Spaces</Link></div>
+        <ScrollReveal>
+          <div className="text-center mb-16">
+            <p className="text-xs tracking-[0.3em] uppercase mb-3 font-body font-semibold" style={{ color: '#C9B97A' }}>Lakefront Economy</p>
+            <h2 className="font-display text-3xl lg:text-4xl font-bold text-white">Available Spaces</h2>
+            <div className="w-12 h-[2px] mx-auto mt-4" style={{ backgroundColor: '#C9B97A' }} />
+          </div>
+        </ScrollReveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {mockSpaces.map((space, i) => (
+            <ScrollReveal key={space.id} delay={i * 100}>
+              <div className="bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] rounded-xl p-6 transition-all duration-500 hover:bg-white/[0.08] hover:border-white/[0.15] hover-lift">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-body font-semibold uppercase tracking-wider" style={{ backgroundColor: 'rgba(201,185,122,0.2)', color: '#C9B97A' }}>{space.type}</span>
+                </div>
+                <h3 className="font-display text-base font-semibold text-white mb-2">{space.name}</h3>
+                <p className="text-sm text-white/30 font-body mb-4 line-clamp-2">{space.description}</p>
+                <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
+                  <span className="text-sm font-body text-white/40">{space.sqft.toLocaleString()} sqft</span>
+                  {space.monthlyRate ? <span className="text-sm font-body font-semibold" style={{ color: '#C9B97A' }}>${space.monthlyRate.toLocaleString()}/mo</span> : null}
+                </div>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+        <ScrollReveal>
+          <div className="text-center mt-12">
+            <Link href="/commercial" className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-sm font-body font-semibold tracking-wider uppercase transition-all duration-300 text-white btn-magnetic" style={{ backgroundColor: '#C9B97A' }}>
+              View All Spaces
+            </Link>
+          </div>
+        </ScrollReveal>
       </div>
     </section>
 
-    {/* CTA */}
-    <section className="relative py-24 overflow-hidden"><div className="absolute inset-0 bg-brand-cream" /><div className="relative max-container section-padding text-center"><h2 className="font-display text-3xl lg:text-4xl font-bold text-brand-forest mb-4">Join the Lakefront Economy</h2><p className="text-base text-brand-muted font-body mb-8 max-w-md mx-auto">Whether you&apos;re a job seeker, entrepreneur, service provider, or investor &mdash; there&apos;s a place for you.</p><div className="flex flex-wrap justify-center gap-4"><Link href="/apply" className="btn-primary">Apply Now</Link><Link href="/investors" className="btn-secondary text-xs">Invest in Lakefront Economy</Link></div></div></section>
+    {/* ===== CTA ===== */}
+    <section className="relative py-28 overflow-hidden bg-[#FAFAF7]">
+      <div className="max-container section-padding text-center relative">
+        <ScrollReveal variant="scale">
+          <h2 className="font-display text-3xl lg:text-[2.5rem] font-bold leading-tight mb-4" style={{ color: '#2C3E2D' }}>Join the Lakefront Economy</h2>
+          <div className="w-12 h-[2px] mx-auto mt-2 mb-6" style={{ backgroundColor: '#C9B97A' }} />
+          <p className="text-base text-gray-400 font-body mb-10 max-w-md mx-auto leading-relaxed">Whether you&apos;re a job seeker, entrepreneur, service provider, or investor &mdash; there&apos;s a place for you.</p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link href="/apply" className="group inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-sm font-body font-semibold tracking-wider uppercase text-white transition-all duration-400 hover:shadow-lg hover:shadow-[#C9B97A]/20 btn-magnetic" style={{ backgroundColor: '#C9B97A' }}>
+              Apply Now
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+            <Link href="/investors" className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-sm font-body font-semibold tracking-wider uppercase transition-all duration-300 btn-magnetic" style={{ border: '2px solid #2C3E2D', color: '#2C3E2D' }}>Invest in Lakefront</Link>
+          </div>
+        </ScrollReveal>
+      </div>
+    </section>
   </>);
 }
