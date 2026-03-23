@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { ghlConfig, isGhlConfigured } from '@/lib/ghl/config';
+import { isGhlConfigured } from '@/lib/ghl/config';
 import { ghl } from '@/lib/ghl/client';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/jobs
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { searchParams } = new URL(req.url);
@@ -28,7 +27,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ jobs: jobs || [] });
 }
 
-// POST /api/jobs — admin creates job, syncs to GHL
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -41,17 +39,17 @@ export async function POST(req: NextRequest) {
 
   const jobData: Record<string, any> = {
     title: body.title || '',
-    description: body.description || '',
-    company_name: body.company_name || '',
+    description: body.description || null,
+    company_name: body.company_name || null,
     location: body.location || 'Lakefront Estates, Okeechobee, FL',
     job_type: body.job_type || 'full-time',
-    salary_range: body.salary_range || '',
-    requirements: body.requirements || '',
-    benefits: body.benefits || '',
+    salary_range: body.salary_range || null,
+    requirements: body.requirements || null,
+    benefits: body.benefits || null,
     category: body.category || 'General',
     compensation_type: body.compensation_type || 'salary',
     work_mode: body.work_mode || 'on_site',
-    department: body.department || '',
+    department: body.department || null,
     status: body.status || 'draft',
     visibility: body.visibility || 'public',
     is_public: body.visibility !== 'admin_only',
@@ -60,7 +58,7 @@ export async function POST(req: NextRequest) {
     closing_date: body.closing_date || null,
     openings_count: body.openings_count || 1,
     skills_required: body.skills_required || [],
-    special_offer: body.special_offer || '',
+    special_offer: body.special_offer || null,
     approval_status: 'approved',
     created_by: user.id,
   };
@@ -68,21 +66,16 @@ export async function POST(req: NextRequest) {
   const { data: job, error } = await supabase.from('lf_jobs').insert(jobData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync to GHL as Custom Object record (if configured)
+  // Sync company to GHL
   let ghlSynced = false;
   if (isGhlConfigured() && job) {
     try {
-      // Also create as a GHL Company if company_name is provided
       if (body.company_name) {
-        try {
-          await ghl.createCompany({ name: body.company_name });
-        } catch { /* may already exist */ }
+        try { await ghl.createCompany({ name: body.company_name }); } catch { /* may exist */ }
       }
       ghlSynced = true;
       await supabase.from('lf_jobs').update({ ghl_synced_at: new Date().toISOString() }).eq('id', job.id);
-    } catch (err) {
-      console.error('GHL sync failed:', err);
-    }
+    } catch { /* GHL sync non-critical */ }
   }
 
   return NextResponse.json({ job, ghlSynced });

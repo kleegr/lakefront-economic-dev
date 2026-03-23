@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-// GET /api/jobs/[id] — get single job (public or admin)
+// Convert empty strings to null for date/nullable fields
+function cleanValue(val: any, fieldName: string): any {
+  const dateFields = ['closing_date', 'posted_date'];
+  if (dateFields.includes(fieldName) && (val === '' || val === undefined)) return null;
+  if (val === '' && fieldName !== 'title') return null; // most fields: empty string -> null
+  return val;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabase();
@@ -10,7 +17,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({ job });
 }
 
-// PUT /api/jobs/[id] — admin updates a job
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabase();
@@ -29,10 +35,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     'status', 'visibility', 'is_public', 'closing_date', 'openings_count', 'skills_required', 'special_offer'];
 
   for (const field of allowedFields) {
-    if (body[field] !== undefined) updateData[field] = body[field];
+    if (body[field] !== undefined) updateData[field] = cleanValue(body[field], field);
   }
 
-  // Auto-set posted_date when publishing
   if (body.status === 'published') updateData.posted_date = new Date().toISOString().split('T')[0];
   if (body.title) updateData.slug = body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -41,7 +46,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({ job });
 }
 
-// DELETE /api/jobs/[id] — admin deletes a job
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabase();
