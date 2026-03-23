@@ -2,9 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Menu, X, ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
@@ -30,18 +28,19 @@ export function PublicHeader() {
     <header className="fixed top-0 left-0 right-0 z-50 shadow-md" style={{ backgroundColor: '#5A695F' }}>
       <div className="max-container section-padding">
         <div className="flex items-center justify-between h-[87px]">
-          {/* Logo — matches lakefrontestatesfl.com exactly */}
+          {/* Logo on top left — text-based to avoid external image loading issues */}
           <Link href="/" className="flex items-center shrink-0">
-            <img
-              src="https://lakefrontestatesfl.com/wp-content/uploads/2025/06/Lakefront-Estates-logo-dark-no-icon-large-no-bg-scaled.png"
-              alt="Lakefront Estates & Villas"
-              width={150}
-              height={47}
-              className="h-[47px] w-auto"
-            />
+            <div className="flex flex-col">
+              <span className="font-display text-2xl font-bold leading-tight" style={{ color: '#FFFFFF' }}>
+                Lakefront
+              </span>
+              <span className="text-[10px] font-body font-semibold tracking-[0.25em] uppercase leading-tight" style={{ color: '#C9B97A' }}>
+                Estates &amp; Villas
+              </span>
+            </div>
           </Link>
 
-          {/* Desktop Nav */}
+          {/* Desktop Nav — centered */}
           <nav className="hidden lg:flex items-center gap-1">
             {NAV_ITEMS.map((item) => (
               <div
@@ -80,14 +79,23 @@ export function PublicHeader() {
             ))}
           </nav>
 
-          {/* Single CTA — matches lakefrontestatesfl.com "Application" button */}
+          {/* Two buttons: Application + Sign In */}
           <div className="hidden lg:flex items-center gap-3">
+            <Link
+              href="/apply"
+              className="px-6 py-2.5 rounded text-sm font-body font-semibold tracking-wider uppercase transition-all duration-200"
+              style={{ backgroundColor: '#C9B97A', color: '#FFFFFF' }}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#b8a96a'; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#C9B97A'; }}
+            >
+              Application
+            </Link>
             <Link
               href="/auth/login"
               className="px-6 py-2.5 rounded text-sm font-body font-semibold tracking-wider uppercase transition-all duration-200"
-              style={{ backgroundColor: '#5A695F', color: '#F4F0E9', border: '2px solid #F4F0E9' }}
+              style={{ backgroundColor: 'transparent', color: '#F4F0E9', border: '2px solid #F4F0E9' }}
               onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F4F0E9'; e.currentTarget.style.color = '#5A695F'; }}
-              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#5A695F'; e.currentTarget.style.color = '#F4F0E9'; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#F4F0E9'; }}
             >
               Sign In
             </Link>
@@ -132,7 +140,15 @@ export function PublicHeader() {
                 ))}
               </div>
             ))}
-            <div className="pt-4">
+            <div className="pt-4 space-y-2">
+              <Link
+                href="/apply"
+                className="block w-full text-center py-2.5 rounded text-sm font-body font-semibold uppercase tracking-wider"
+                style={{ backgroundColor: '#C9B97A', color: '#FFFFFF' }}
+                onClick={() => setMobileOpen(false)}
+              >
+                Application
+              </Link>
               <Link
                 href="/auth/login"
                 className="block w-full text-center py-2.5 rounded text-sm font-body font-semibold uppercase tracking-wider"
