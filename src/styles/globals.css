@@ -23,25 +23,181 @@
   .text-gradient { @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-forest to-brand-sage; }
 }
 
-/* Sub-page hero: MUST use !important to override Tailwind py-* utilities */
-.gradient-forest {
-  background-color: #2C3E2D;
-  padding-top: 220px !important;
-}
+/* Sub-page hero */
+.gradient-forest { background-color:#2C3E2D; padding-top:220px !important; }
 
+/* Scrollbar */
 .portal-scroll::-webkit-scrollbar { width:6px; }
 .portal-scroll::-webkit-scrollbar-track { background:transparent; }
 .portal-scroll::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:3px; }
 .portal-scroll::-webkit-scrollbar-thumb:hover { background:#9ca3af; }
 
+/* ===== MODERN ANIMATIONS ===== */
+
+/* Hero pan */
 @keyframes panImage0 { 0%{transform:scale(1.1) translate(0,0)} 50%{transform:scale(1.15) translate(-3%,-2%)} 100%{transform:scale(1.1) translate(0,0)} }
 @keyframes panImage1 { 0%{transform:scale(1.1) translate(0,0)} 50%{transform:scale(1.15) translate(3%,2%)} 100%{transform:scale(1.1) translate(0,0)} }
 @keyframes panImage2 { 0%{transform:scale(1.1) translate(0,0)} 50%{transform:scale(1.2) translate(-2%,3%)} 100%{transform:scale(1.1) translate(0,0)} }
 
-@keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+/* Fade & slide animations */
+@keyframes fadeInUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes fadeInScale { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
 @keyframes slideInRight { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
-.animate-fade-in-up { animation:fadeInUp .6s ease-out forwards; }
+@keyframes slideInLeft { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)} }
+@keyframes reveal { from{clip-path:inset(0 100% 0 0)} to{clip-path:inset(0 0 0 0)} }
+
+/* Preloader */
+@keyframes preloaderPulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+@keyframes preloaderFade { from{opacity:1} to{opacity:0;visibility:hidden;pointer-events:none} }
+
+/* Scroll-triggered reveal */
+@keyframes scrollRevealUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+@keyframes scrollRevealScale { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
+
+.animate-fade-in-up { animation:fadeInUp .7s cubic-bezier(.22,1,.36,1) forwards; }
 .animate-fade-in { animation:fadeIn .5s ease-out forwards; }
+.animate-fade-in-scale { animation:fadeInScale .6s cubic-bezier(.22,1,.36,1) forwards; }
 .animate-slide-in-right { animation:slideInRight .5s ease-out forwards; }
-.stagger-1{animation-delay:.1s} .stagger-2{animation-delay:.2s} .stagger-3{animation-delay:.3s} .stagger-4{animation-delay:.4s}
+.animate-slide-in-left { animation:slideInLeft .5s ease-out forwards; }
+
+.stagger-1{animation-delay:.1s} .stagger-2{animation-delay:.2s} .stagger-3{animation-delay:.35s} .stagger-4{animation-delay:.5s} .stagger-5{animation-delay:.65s}
+
+/* Scroll reveal utility — elements start invisible, animate on scroll */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(.22,1,.36,1), transform 0.8s cubic-bezier(.22,1,.36,1);
+}
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+.scroll-reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.8s cubic-bezier(.22,1,.36,1), transform 0.8s cubic-bezier(.22,1,.36,1);
+}
+.scroll-reveal-scale.revealed {
+  opacity: 1;
+  transform: scale(1);
+}
+.scroll-reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: opacity 0.8s cubic-bezier(.22,1,.36,1), transform 0.8s cubic-bezier(.22,1,.36,1);
+}
+.scroll-reveal-left.revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+.scroll-reveal-right {
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.8s cubic-bezier(.22,1,.36,1), transform 0.8s cubic-bezier(.22,1,.36,1);
+}
+.scroll-reveal-right.revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Stagger children in scroll-reveal containers */
+.scroll-stagger > *:nth-child(1) { transition-delay: 0s; }
+.scroll-stagger > *:nth-child(2) { transition-delay: 0.1s; }
+.scroll-stagger > *:nth-child(3) { transition-delay: 0.2s; }
+.scroll-stagger > *:nth-child(4) { transition-delay: 0.3s; }
+.scroll-stagger > *:nth-child(5) { transition-delay: 0.4s; }
+.scroll-stagger > *:nth-child(6) { transition-delay: 0.5s; }
+
+/* Modern hover card lift */
+.hover-lift {
+  transition: transform 0.35s cubic-bezier(.22,1,.36,1), box-shadow 0.35s cubic-bezier(.22,1,.36,1);
+}
+.hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12);
+}
+
+/* Magnetic button micro-interaction */
+.btn-magnetic {
+  transition: transform 0.25s cubic-bezier(.22,1,.36,1);
+}
+.btn-magnetic:hover {
+  transform: scale(1.03);
+}
+.btn-magnetic:active {
+  transform: scale(0.97);
+}
+
+/* Glassmorphism header */
+.glass-header {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.glass-header.scrolled {
+  background: rgba(255,255,255,0.95);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.06);
+}
+
+/* Parallax helper */
+.parallax-slow { will-change: transform; }
+
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.page-transition-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.4s cubic-bezier(.22,1,.36,1), transform 0.4s cubic-bezier(.22,1,.36,1);
+}
+
+/* Preloader */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: #FAFAF7;
+  animation: preloaderFade 0.6s ease-out 1.8s forwards;
+}
+.preloader-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5A695F;
+  animation: preloaderPulse 1.2s ease-in-out infinite;
+}
+.preloader-dot:nth-child(2) { animation-delay: 0.2s; }
+.preloader-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Line reveal for headings */
+.line-reveal {
+  position: relative;
+  overflow: hidden;
+}
+.line-reveal::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 2px;
+  background: #C9B97A;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s cubic-bezier(.22,1,.36,1) 0.3s;
+}
+.line-reveal.revealed::after {
+  transform: scaleX(1);
+}
+
+/* Counter animation */
+@keyframes countUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.count-up { animation: countUp 0.6s cubic-bezier(.22,1,.36,1) forwards; }
