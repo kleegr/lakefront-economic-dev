@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { syncJobToGhl } from '@/lib/ghl/job-sync';
+import { getFieldsConfig } from '@/lib/ghl/get-fields-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,10 +66,11 @@ export async function POST(req: NextRequest) {
   const { data: job, error } = await supabase.from('lf_jobs').insert(jobData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync to GHL Custom Object
+  // Sync to GHL using DB config
   let ghlSynced = false;
   if (job) {
-    const syncResult = await syncJobToGhl(job);
+    const fields = await getFieldsConfig();
+    const syncResult = await syncJobToGhl(job, fields, null);
     ghlSynced = syncResult.success;
     if (ghlSynced && syncResult.ghlRecordId) {
       await supabase.from('lf_jobs').update({
