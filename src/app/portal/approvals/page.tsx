@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CheckCircle, XCircle, Clock, Pencil, Eye, X, AlertTriangle } from 'lucide-react';
+import { Eye, X } from 'lucide-react';
 
 type R = Record<string,unknown>;
 const g = (r:R,k:string):string => (r[k] as string)||'';
@@ -19,24 +19,25 @@ export default function ApprovalsPage() {
   async function loadAll() {
     const { data: a } = await supabase.from('lf_profiles').select('*').in('account_status', ['pending','suspended']).order('created_at', { ascending: false });
     setAccounts(a||[]);
-    const { data: j } = await supabase.from('lf_jobs').select('*, lf_profiles!lf_jobs_created_by_fkey(full_name, email)').eq('approval_status', 'pending').order('created_at', { ascending: false });
+    const { data: j } = await supabase.from('lf_jobs').select('*').eq('approval_status', 'pending').order('created_at', { ascending: false });
     setJobs(j||[]);
     setLoading(false);
   }
 
   const approveAccount = async (id: string) => {
     await supabase.from('lf_profiles').update({ account_status: 'approved' }).eq('id', id);
-    await supabase.from('lf_audit_log').insert({ user_id: (await supabase.auth.getUser()).data.user?.id, action: 'account_approved', entity_type: 'profile', entity_id: id, details: { status: 'approved' } });
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    await supabase.from('lf_audit_log').insert({ user_id: uid, action: 'account_approved', entity_type: 'profile', entity_id: id, details: { status: 'approved' } });
     loadAll();
   };
   const rejectAccount = async (id: string) => {
     await supabase.from('lf_profiles').update({ account_status: 'rejected' }).eq('id', id);
-    await supabase.from('lf_audit_log').insert({ user_id: (await supabase.auth.getUser()).data.user?.id, action: 'account_rejected', entity_type: 'profile', entity_id: id, details: { status: 'rejected' } });
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    await supabase.from('lf_audit_log').insert({ user_id: uid, action: 'account_rejected', entity_type: 'profile', entity_id: id, details: { status: 'rejected' } });
     loadAll();
   };
   const approveJob = async (id: string) => {
     const uid = (await supabase.auth.getUser()).data.user?.id;
-    // If job has pending_changes and was previously approved, apply them
     const { data: job } = await supabase.from('lf_jobs').select('pending_changes').eq('id', id).single();
     const pc = job?.pending_changes as R|null;
     if (pc && (pc as R).action === 'delete') {
@@ -97,17 +98,17 @@ export default function ApprovalsPage() {
       {tab==='jobs' && (
         <div className="bg-white rounded-xl border overflow-hidden">
           {jobs.length===0 ? <p className="p-8 text-center text-sm text-gray-400 font-body">No pending jobs.</p> : (
-            <table className="w-full text-sm font-body"><thead><tr className="text-left text-xs text-gray-400 uppercase border-b bg-gray-50"><th className="p-3">Job</th><th className="p-3">Submitted By</th><th className="p-3">Type</th><th className="p-3">Created</th><th className="p-3 text-right">Actions</th></tr></thead>
+            <table className="w-full text-sm font-body"><thead><tr className="text-left text-xs text-gray-400 uppercase border-b bg-gray-50"><th className="p-3">Job</th><th className="p-3">Type</th><th className="p-3">Comp</th><th className="p-3">Created</th><th className="p-3 text-right">Actions</th></tr></thead>
               <tbody>{jobs.map(j => {
+                const hasPc = !!j.pending_changes;
                 const pc = j.pending_changes as R|null;
-                const isDelete = pc && (pc as R).action === 'delete';
-                const isEdit = pc && !isDelete && Object.keys(pc).length > 0;
-                const creator = (j.lf_profiles as R) || {};
+                const isDelete = hasPc && pc && (pc as R).action === 'delete';
+                const isEdit = hasPc && !isDelete;
                 return (
                   <tr key={g(j,'id')} className="border-b border-gray-100">
                     <td className="p-3"><div className="font-semibold text-brand-forest">{g(j,'title')}</div>{isDelete && <span className="text-[10px] text-red-600 font-semibold">DELETE REQUEST</span>}{isEdit && <span className="text-[10px] text-blue-600 font-semibold">EDIT PENDING</span>}</td>
-                    <td className="p-3 text-xs">{g(creator,'full_name')||g(creator,'email')||'Admin'}</td>
-                    <td className="p-3 text-xs">{g(j,'compensation_type')||g(j,'job_type')}</td>
+                    <td className="p-3 text-xs">{g(j,'job_type')}</td>
+                    <td className="p-3 text-xs">{g(j,'salary_range')}</td>
                     <td className="p-3 text-xs text-gray-400">{new Date(g(j,'created_at')).toLocaleDateString()}</td>
                     <td className="p-3 text-right"><div className="flex gap-1 justify-end">
                       <button onClick={()=>{setDetail(j); setEditNotes('');}} className="p-1.5 text-gray-400 hover:text-brand-forest hover:bg-brand-sage/10 rounded"><Eye className="w-3.5 h-3.5" /></button>
@@ -122,7 +123,6 @@ export default function ApprovalsPage() {
         </div>
       )}
 
-      {/* Detail Modal */}
       {detail && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
@@ -135,8 +135,8 @@ export default function ApprovalsPage() {
                 <div><strong>Work Mode:</strong> {g(detail,'work_mode')}</div>
                 <div><strong>Status:</strong> {g(detail,'job_status')}</div>
               </div>
-              {g(detail,'requirements') && <div><strong>Requirements:</strong> <p className="text-gray-600">{g(detail,'requirements')}</p></div>}
-              {detail.pending_changes && <div className="bg-amber-50 border border-amber-200 rounded p-3"><strong className="text-amber-800">Pending Changes:</strong><pre className="text-xs text-amber-700 mt-1 whitespace-pre-wrap">{JSON.stringify(detail.pending_changes, null, 2)}</pre></div>}
+              {g(detail,'requirements') ? <div><strong>Requirements:</strong> <p className="text-gray-600">{g(detail,'requirements')}</p></div> : null}
+              {!!detail.pending_changes ? <div className="bg-amber-50 border border-amber-200 rounded p-3"><strong className="text-amber-800">Pending Changes:</strong><pre className="text-xs text-amber-700 mt-1 whitespace-pre-wrap">{JSON.stringify(detail.pending_changes, null, 2)}</pre></div> : null}
               <div><label className="text-xs font-semibold uppercase block mb-1">Admin Notes</label><textarea value={editNotes} onChange={e=>setEditNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded text-sm" placeholder="Optional notes..." /></div>
             </div>
             <div className="flex gap-2 mt-6">
