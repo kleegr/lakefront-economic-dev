@@ -2,12 +2,18 @@
 // Schema: custom_objects.job_openings
 //
 // FIELD KEYS & TYPES:
-// job_title (text), company__employer (text), location (text),
-// category (dropdown→array), job_type (dropdown→array), work_mode (dropdown→array),
-// salary_range (text), compensation_type (dropdown→array), department (text),
-// job_details (multi-line text), requirements (multi-line text),
-// benefits (multi-line text), special_offer (text),
-// closing_date (date string), openings_count (number), supabase_id (text)
+// job_title (text/required), company__employer (text), location (text),
+// category (dropdown), job_type (dropdown), work_mode (dropdown),
+// salary_range (text), compensation_type (dropdown), department (text),
+// job_details (multi-line), requirements (multi-line), benefits (multi-line),
+// special_offer (text), closing_date (date), openings_count (number),
+// supabase_id (text)
+//
+// GHL DROPDOWN RULES:
+// - Must send as array: ["value"]
+// - Values must EXACTLY match the option labels in GHL
+// - Empty array [] = no selection (safe to send)
+// - GHL dates: must be valid ISO date or omit entirely (NOT empty string)
 import { ghlConfig, isGhlConfigured } from './config';
 
 const SCHEMA_KEY = 'custom_objects.job_openings';
@@ -44,37 +50,75 @@ export interface JobSyncData {
   application_count?: number | null;
 }
 
-// Wrap value in array for GHL dropdown fields
-function toDropdown(val: string | null | undefined): string[] {
-  return val ? [val] : [];
+// Map Supabase values to GHL dropdown option labels
+// These MUST match exactly what's in GHL Custom Object dropdown options
+const CATEGORY_MAP: Record<string, string> = {
+  'General': 'General', 'Retail': 'Retail', 'Healthcare': 'Healthcare',
+  'Food Service': 'Food Service', 'Maintenance': 'Maintenance', 'Security': 'Security',
+  'Education': 'Education', 'Professional Services': 'Professional Services',
+  'Technology': 'Technology', 'Construction': 'Construction', 'Management': 'Management',
+  'Marketing': 'Marketing', 'Other': 'Other',
+};
+const JOB_TYPE_MAP: Record<string, string> = {
+  'full-time': 'Full-Time', 'part-time': 'Part-Time', 'contract': 'Contract',
+  'seasonal': 'Seasonal', 'internship': 'Internship',
+};
+const WORK_MODE_MAP: Record<string, string> = {
+  'on_site': 'On Site', 'remote': 'Remote', 'hybrid': 'Hybrid',
+};
+const COMP_TYPE_MAP: Record<string, string> = {
+  'salary': 'Salary', 'hourly': 'Hourly', 'commission': 'Commission',
+  'base_commission': 'Base + Commission', 'other': 'Other',
+};
+
+// Reverse maps for GHL → Supabase
+function reverseMap(map: Record<string, string>): Record<string, string> {
+  const rev: Record<string, string> = {};
+  for (const [k, v] of Object.entries(map)) { rev[v] = k; rev[k] = k; }
+  return rev;
+}
+const REV_CATEGORY = reverseMap(CATEGORY_MAP);
+const REV_JOB_TYPE = reverseMap(JOB_TYPE_MAP);
+const REV_WORK_MODE = reverseMap(WORK_MODE_MAP);
+const REV_COMP_TYPE = reverseMap(COMP_TYPE_MAP);
+
+function toDropdown(val: string | null | undefined, map: Record<string, string>): string[] {
+  if (!val) return [];
+  const mapped = map[val] || map[val.toLowerCase()] || val;
+  return [mapped];
 }
 
-// Extract first value from GHL dropdown array
-function fromDropdown(val: any): string {
-  if (Array.isArray(val)) return val[0] || '';
-  return String(val || '');
+function fromDropdown(val: any, revMap: Record<string, string>): string {
+  const raw = Array.isArray(val) ? (val[0] || '') : String(val || '');
+  return revMap[raw] || raw;
 }
 
 // Map Supabase job → GHL Custom Object properties
 function jobToGhlProperties(job: JobSyncData): Record<string, any> {
-  return {
+  const props: Record<string, any> = {
     job_title: job.title || '',
     company__employer: job.company_name || '',
     location: job.location || 'Lakefront Estates, Okeechobee, FL',
-    category: toDropdown(job.category || 'General'),
-    job_type: toDropdown(job.job_type || 'full-time'),
-    work_mode: toDropdown(job.work_mode || 'on_site'),
+    category: toDropdown(job.category, CATEGORY_MAP),
+    job_type: toDropdown(job.job_type, JOB_TYPE_MAP),
+    work_mode: toDropdown(job.work_mode, WORK_MODE_MAP),
     salary_range: job.salary_range || '',
-    compensation_type: toDropdown(job.compensation_type || 'salary'),
+    compensation_type: toDropdown(job.compensation_type, COMP_TYPE_MAP),
     department: job.department || '',
     job_details: job.description || '',
     requirements: job.requirements || '',
     benefits: job.benefits || '',
     special_offer: job.special_offer || '',
-    closing_date: job.closing_date || '',
     openings_count: job.openings_count || 1,
     supabase_id: job.id,
   };
+
+  // Only send closing_date if it has a real value — GHL rejects empty string
+  if (job.closing_date) {
+    props.closing_date = job.closing_date;
+  }
+
+  return props;
 }
 
 // Map GHL properties → Supabase job
@@ -86,11 +130,11 @@ export function ghlPropertiesToJob(props: Record<string, any>): Partial<JobSyncD
     location: props.location || '',
     description: props.job_details || '',
     requirements: props.requirements || '',
-    category: fromDropdown(props.category) || 'General',
-    job_type: fromDropdown(props.job_type) || 'full-time',
-    work_mode: fromDropdown(props.work_mode) || 'on_site',
+    category: fromDropdown(props.category, REV_CATEGORY) || 'General',
+    job_type: fromDropdown(props.job_type, REV_JOB_TYPE) || 'full-time',
+    work_mode: fromDropdown(props.work_mode, REV_WORK_MODE) || 'on_site',
     salary_range: props.salary_range || '',
-    compensation_type: fromDropdown(props.compensation_type) || 'salary',
+    compensation_type: fromDropdown(props.compensation_type, REV_COMP_TYPE) || 'salary',
     department: props.department || '',
     benefits: props.benefits || '',
     special_offer: props.special_offer || '',
