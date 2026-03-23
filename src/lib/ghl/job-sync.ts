@@ -1,10 +1,13 @@
 // GHL Job Sync — 2-way sync: Supabase lf_jobs ↔ GHL Custom Object "Job Openings"
 // Schema: custom_objects.job_openings
 //
-// CONFIRMED WORKING FIELD KEYS (16 total):
-// job_title, company__employer, location, category, job_type, work_mode,
-// salary_range, compensation_type, department, job_details (description),
-// requirements, benefits, special_offer, closing_date, openings_count, supabase_id
+// FIELD KEYS & TYPES:
+// job_title (text), company__employer (text), location (text),
+// category (dropdown→array), job_type (dropdown→array), work_mode (dropdown→array),
+// salary_range (text), compensation_type (dropdown→array), department (text),
+// job_details (multi-line text), requirements (multi-line text),
+// benefits (multi-line text), special_offer (text),
+// closing_date (date string), openings_count (number), supabase_id (text)
 import { ghlConfig, isGhlConfigured } from './config';
 
 const SCHEMA_KEY = 'custom_objects.job_openings';
@@ -41,17 +44,28 @@ export interface JobSyncData {
   application_count?: number | null;
 }
 
+// Wrap value in array for GHL dropdown fields
+function toDropdown(val: string | null | undefined): string[] {
+  return val ? [val] : [];
+}
+
+// Extract first value from GHL dropdown array
+function fromDropdown(val: any): string {
+  if (Array.isArray(val)) return val[0] || '';
+  return String(val || '');
+}
+
 // Map Supabase job → GHL Custom Object properties
 function jobToGhlProperties(job: JobSyncData): Record<string, any> {
   return {
     job_title: job.title || '',
     company__employer: job.company_name || '',
     location: job.location || 'Lakefront Estates, Okeechobee, FL',
-    category: job.category || 'General',
-    job_type: (job.job_type || 'full-time').toLowerCase(),
-    work_mode: (job.work_mode || 'on_site').toLowerCase(),
+    category: toDropdown(job.category || 'General'),
+    job_type: toDropdown(job.job_type || 'full-time'),
+    work_mode: toDropdown(job.work_mode || 'on_site'),
     salary_range: job.salary_range || '',
-    compensation_type: (job.compensation_type || 'salary').toLowerCase(),
+    compensation_type: toDropdown(job.compensation_type || 'salary'),
     department: job.department || '',
     job_details: job.description || '',
     requirements: job.requirements || '',
@@ -72,11 +86,11 @@ export function ghlPropertiesToJob(props: Record<string, any>): Partial<JobSyncD
     location: props.location || '',
     description: props.job_details || '',
     requirements: props.requirements || '',
-    category: props.category || 'General',
-    job_type: props.job_type || 'full-time',
-    work_mode: props.work_mode || 'on_site',
+    category: fromDropdown(props.category) || 'General',
+    job_type: fromDropdown(props.job_type) || 'full-time',
+    work_mode: fromDropdown(props.work_mode) || 'on_site',
     salary_range: props.salary_range || '',
-    compensation_type: props.compensation_type || 'salary',
+    compensation_type: fromDropdown(props.compensation_type) || 'salary',
     department: props.department || '',
     benefits: props.benefits || '',
     special_offer: props.special_offer || '',
