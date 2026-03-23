@@ -1,52 +1,114 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, MapPin, Briefcase, ArrowRight, LogIn } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { MapPin, ArrowRight, Briefcase, Search, Filter } from 'lucide-react';
+import { ScrollReveal } from '@/components/public/ScrollReveal';
 
-type Job = Record<string, unknown>;
-const g = (j: Job, k: string): string => (j[k] as string) || '';
+function formatEnum(s: string) {
+  return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [query, setQuery] = useState('');
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const { data } = await supabase.from('lf_jobs').select('*').eq('status', 'published').order('created_at', { ascending: false });
-      setJobs(data || []); setLoading(false);
-    }
-    load();
+    fetch('/api/jobs')
+      .then(r => r.json())
+      .then(d => { setJobs(d.jobs || []); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
+  const categories = Array.from(new Set(jobs.map(j => j.category).filter(Boolean)));
+  const types = Array.from(new Set(jobs.map(j => j.job_type).filter(Boolean)));
+
   const filtered = jobs.filter(j => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return g(j,'title').toLowerCase().includes(q) || g(j,'company_name').toLowerCase().includes(q) || g(j,'category').toLowerCase().includes(q);
+    if (search && !j.title?.toLowerCase().includes(search.toLowerCase()) && !j.company_name?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (categoryFilter && j.category !== categoryFilter) return false;
+    if (typeFilter && j.job_type !== typeFilter) return false;
+    return true;
   });
 
   return (
-    <>
-      <section className="gradient-forest py-16 lg:py-24"><div className="max-container section-padding"><p className="text-brand-gold font-body font-semibold text-xs tracking-[0.2em] uppercase mb-4">Careers</p><h1 className="font-display text-3xl lg:text-5xl font-bold text-white mb-4">Jobs Board</h1><p className="text-lg text-white/60 font-body max-w-xl">Find your next career opportunity within the Lakefront community.</p></div></section>
-      <section className="sticky top-20 z-30 bg-white border-b border-gray-200 shadow-sm"><div className="max-container section-padding py-4"><div className="flex gap-3"><div className="flex-1 relative"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Search jobs..." value={query} onChange={e => setQuery(e.target.value)} className="input-field pl-11 py-2.5 text-sm" /></div><Link href="/auth/login?redirect=/applicant/jobs" className="flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-sm text-sm font-body font-semibold hover:bg-brand-forest/90"><LogIn className="w-4 h-4" />Sign In to Apply</Link></div></div></section>
-      <section className="py-10 lg:py-16 bg-brand-warm min-h-[50vh]"><div className="max-container section-padding">
-        <p className="text-sm font-body text-brand-muted mb-6"><span className="font-semibold text-brand-text">{filtered.length}</span> position{filtered.length !== 1 ? 's' : ''} available</p>
-        {loading ? <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div> : filtered.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">{filtered.map(job => {
-            const sb = g(job,'job_status')==='coming_soon'?'Coming Soon':g(job,'job_status')==='accepting_offers'?'Accepting Offers':g(job,'job_status')==='hired'||g(job,'job_status')==='filled'?'Filled':'';
-            return (<Link key={g(job,'id')} href={`/jobs/${g(job,'id')}`} className="card-public p-6 group">
-              <div className="flex items-start justify-between mb-4"><span className="px-3 py-1 bg-brand-sage/10 text-brand-sage text-xs font-body font-semibold rounded-sm">{g(job,'job_type')||'Full-time'}</span>{sb&&<span className="px-2 py-0.5 bg-brand-gold/10 text-brand-gold text-xs font-body font-medium rounded-sm">{sb}</span>}</div>
-              <h3 className="font-display text-lg font-semibold text-brand-forest mb-2 group-hover:text-brand-sage transition-colors">{g(job,'title')}</h3>
-              {g(job,'company_name')&&<p className="text-sm text-brand-muted font-body mb-1">{g(job,'company_name')}</p>}
-              <div className="flex items-center gap-1 text-sm text-brand-muted font-body mb-4"><MapPin className="w-3.5 h-3.5" />{g(job,'location')||'Lakefront Estates'}</div>
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-between"><span className="text-sm font-body font-semibold text-brand-forest">{g(job,'salary_range')||'Contact for details'}</span><span className="text-xs text-brand-sage font-body font-semibold flex items-center gap-1">View <ArrowRight className="w-3 h-3" /></span></div>
-            </Link>);
-          })}</div>
-        ) : (<div className="text-center py-20"><Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-4" /><h3 className="font-display text-xl font-semibold text-brand-text mb-2">No positions found</h3></div>)}
-        <div className="mt-16 text-center bg-white rounded-sm border border-gray-100 p-10"><h3 className="font-display text-2xl font-bold text-brand-forest mb-3">Ready to Apply?</h3><p className="text-brand-muted font-body mb-6 max-w-md mx-auto">Sign in to your Resident Portal to browse, save, and apply for jobs.</p><Link href="/auth/login?redirect=/applicant/jobs" className="btn-primary text-xs">Sign In / Create Account</Link></div>
-      </div></section>
-    </>
+    <div className="gradient-forest pb-0">
+      <div className="max-container section-padding pb-16">
+        <ScrollReveal>
+          <div className="text-center mb-12">
+            <p className="text-xs tracking-[0.3em] uppercase mb-3 font-body font-semibold" style={{ color: '#C9B97A' }}>Careers</p>
+            <h1 className="font-display text-3xl lg:text-4xl font-bold text-white">Open Positions</h1>
+            <div className="w-12 h-[2px] mx-auto mt-4 mb-4" style={{ backgroundColor: '#C9B97A' }} />
+            <p className="text-base text-white/50 font-body max-w-lg mx-auto">Join the Lakefront Economy. Find your next career opportunity.</p>
+          </div>
+        </ScrollReveal>
+
+        {/* Filters */}
+        <ScrollReveal>
+          <div className="bg-white/[0.06] backdrop-blur-sm border border-white/[0.1] rounded-xl p-4 mb-8 flex flex-wrap gap-3">
+            <div className="flex-1 min-w-[200px] relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search jobs..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white/[0.06] border border-white/[0.1] rounded-lg text-sm font-body text-white placeholder:text-white/30 focus:outline-none focus:border-[#C9B97A]/50"
+              />
+            </div>
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="px-4 py-2.5 bg-white/[0.06] border border-white/[0.1] rounded-lg text-sm font-body text-white/70 focus:outline-none">
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={String(c)} value={String(c)}>{String(c)}</option>)}
+            </select>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-4 py-2.5 bg-white/[0.06] border border-white/[0.1] rounded-lg text-sm font-body text-white/70 focus:outline-none">
+              <option value="">All Types</option>
+              {types.map(t => <option key={String(t)} value={String(t)}>{formatEnum(String(t))}</option>)}
+            </select>
+          </div>
+        </ScrollReveal>
+      </div>
+
+      {/* Jobs List */}
+      <div className="bg-[#FAFAF7] py-16">
+        <div className="max-container section-padding">
+          {loading ? (
+            <div className="text-center py-20"><div className="animate-spin h-8 w-8 border-4 border-[#C9B97A] border-t-transparent rounded-full mx-auto" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20">
+              <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-400 font-body">No positions found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filtered.map((job, i) => (
+                <ScrollReveal key={job.id} delay={i * 60}>
+                  <Link href={`/jobs/${job.id}`} className="block bg-white rounded-xl border border-gray-100 p-6 hover-lift group transition-all">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase tracking-wider" style={{ backgroundColor: 'rgba(44,62,45,0.08)', color: '#2C3E2D' }}>{formatEnum(job.job_type || '')}</span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase tracking-wider bg-gray-50 text-gray-500">{job.category || 'General'}</span>
+                          {job.work_mode && job.work_mode !== 'on_site' && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase tracking-wider bg-blue-50 text-blue-600">{formatEnum(job.work_mode)}</span>
+                          )}
+                        </div>
+                        <h2 className="font-display text-lg font-semibold transition-colors duration-300 group-hover:text-[#C9B97A]" style={{ color: '#2C3E2D' }}>{job.title}</h2>
+                        <p className="text-sm text-gray-400 font-body mt-1">{job.company_name}</p>
+                        <div className="flex items-center gap-1 text-sm text-gray-400 font-body mt-1"><MapPin className="w-3.5 h-3.5" />{job.location || 'Okeechobee, FL'}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-body font-semibold" style={{ color: '#2C3E2D' }}>{job.salary_range || 'Competitive'}</span>
+                        <div className="mt-2"><ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-[#C9B97A] transition-colors ml-auto" /></div>
+                      </div>
+                    </div>
+                  </Link>
+                </ScrollReveal>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

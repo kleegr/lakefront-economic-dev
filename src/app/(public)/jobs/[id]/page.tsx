@@ -1,51 +1,147 @@
 'use client';
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { MapPin, Clock, DollarSign, Briefcase, Building2, ArrowLeft, LogIn } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
-type Job = Record<string, unknown>;
-const s = (j: Job, k: string): string => (j[k] as string) || '';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { MapPin, ArrowLeft, Briefcase, Clock, Building2, Send, CheckCircle } from 'lucide-react';
+
+function formatEnum(s: string) {
+  return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export default function JobDetailPage() {
   const params = useParams();
-  const [job, setJob] = useState<Job | null>(null);
+  const id = params?.id as string;
+  const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { async function load() { const supabase = createClient(); const { data } = await supabase.from('lf_jobs').select('*').eq('id', params.id).eq('status', 'published').maybeSingle(); setJob(data); setLoading(false); } load(); }, [params.id]);
-  if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
-  if (!job) return (<div className="min-h-[60vh] flex items-center justify-center"><div className="text-center"><h1 className="font-display text-2xl font-bold text-brand-forest mb-2">Position Not Found</h1><p className="text-brand-muted font-body mb-4">This job may have been removed or closed.</p><Link href="/jobs" className="btn-secondary text-xs">Back to Jobs</Link></div></div>);
-  const statusLabel = s(job,'job_status')==='coming_soon'?'Coming Soon':s(job,'job_status')==='accepting_offers'?'Accepting Offers':s(job,'job_status')==='hired'||s(job,'job_status')==='filled'?'Filled':'Open';
+  const [showApply, setShowApply] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', coverLetter: '' });
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/jobs/${id}`)
+      .then(r => r.json())
+      .then(d => { setJob(d.job || null); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [id]);
+
+  async function handleApply(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setApplied(true);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to submit');
+      }
+    } catch {
+      alert('Network error');
+    }
+    setSubmitting(false);
+  }
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7] pt-20"><div className="animate-spin h-8 w-8 border-4 border-[#C9B97A] border-t-transparent rounded-full" /></div>;
+  if (!job) return <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7] pt-20"><p className="text-gray-400">Job not found</p></div>;
+
   return (
-    <>
-      <section className="gradient-forest py-12 lg:py-16"><div className="max-container section-padding">
-        <Link href="/jobs" className="inline-flex items-center gap-1.5 text-sm text-white/60 font-body hover:text-white mb-6"><ArrowLeft className="w-4 h-4" /> Back to Jobs</Link>
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3"><span className="px-3 py-1 bg-brand-gold/20 text-brand-gold text-xs font-body font-semibold rounded-sm">{s(job,'job_type')||'Full-time'}</span>{s(job,'category')&&<span className="px-2 py-0.5 bg-white/10 text-white/70 text-xs font-body rounded-sm">{s(job,'category')}</span>}</div>
-            <h1 className="font-display text-3xl lg:text-4xl font-bold text-white mb-2">{s(job,'title')}</h1>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-white/60 font-body">{s(job,'company_name')&&<span className="flex items-center gap-1.5"><Building2 className="w-4 h-4" />{s(job,'company_name')}</span>}<span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" />{s(job,'location')||'Lakefront Estates'}</span></div>
+    <div className="bg-[#FAFAF7] min-h-screen">
+      {/* Hero */}
+      <div className="gradient-forest">
+        <div className="max-container section-padding pb-12">
+          <Link href="/jobs" className="inline-flex items-center gap-1 text-white/40 hover:text-white/70 text-sm font-body mb-6 transition-colors"><ArrowLeft className="w-4 h-4" />Back to Jobs</Link>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="px-3 py-1 rounded-full text-[11px] font-body font-semibold uppercase tracking-wider bg-white/10 text-white/70">{formatEnum(job.job_type || '')}</span>
+            <span className="px-3 py-1 rounded-full text-[11px] font-body font-semibold uppercase tracking-wider bg-white/10 text-white/70">{job.category || 'General'}</span>
           </div>
-          <Link href="/auth/login?redirect=/applicant/jobs" className="btn-primary flex items-center gap-2 shrink-0"><LogIn className="w-4 h-4" />Sign In to Apply</Link>
+          <h1 className="font-display text-3xl lg:text-4xl font-bold text-white mb-3">{job.title}</h1>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-white/50 font-body">
+            <span className="flex items-center gap-1"><Building2 className="w-4 h-4" />{job.company_name}</span>
+            <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{job.location || 'Okeechobee, FL'}</span>
+            {job.work_mode && <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" />{formatEnum(job.work_mode)}</span>}
+          </div>
         </div>
-      </div></section>
-      <section className="py-12 lg:py-16 bg-brand-warm"><div className="max-container section-padding"><div className="grid lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white rounded-sm border border-gray-100 p-8"><h2 className="font-display text-xl font-semibold text-brand-forest mb-4">About This Position</h2><p className="text-brand-text/70 font-body leading-relaxed whitespace-pre-line">{s(job,'description')}</p></div>
-          {s(job,'requirements')&&<div className="bg-white rounded-sm border border-gray-100 p-8"><h2 className="font-display text-xl font-semibold text-brand-forest mb-4">Requirements</h2><p className="text-brand-text/70 font-body leading-relaxed">{s(job,'requirements')}</p></div>}
-          {s(job,'special_offer')&&<div className="bg-white rounded-sm border border-gray-100 p-8"><h2 className="font-display text-xl font-semibold text-brand-forest mb-4">Special Offer</h2><p className="text-brand-text/70 font-body leading-relaxed">{s(job,'special_offer')}</p></div>}
-          <div className="bg-brand-sage/5 rounded-sm border border-brand-sage/20 p-8 text-center"><LogIn className="w-8 h-8 text-brand-sage mx-auto mb-3" /><h3 className="font-display text-lg font-semibold text-brand-forest mb-2">Ready to Apply?</h3><p className="text-sm text-brand-muted font-body mb-4">Sign in to your Resident Portal to apply. You can apply to up to 3 jobs at once.</p><Link href="/auth/login?redirect=/applicant/jobs" className="btn-primary text-xs">Sign In / Create Account</Link></div>
+      </div>
+
+      <div className="max-container section-padding py-12">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Main content */}
+          <div className="lg:col-span-2 space-y-8">
+            {job.description && (
+              <div className="bg-white rounded-xl border border-gray-100 p-6">
+                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>About This Role</h2>
+                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.description}</p>
+              </div>
+            )}
+            {job.requirements && (
+              <div className="bg-white rounded-xl border border-gray-100 p-6">
+                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Requirements</h2>
+                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
+              </div>
+            )}
+            {job.benefits && (
+              <div className="bg-white rounded-xl border border-gray-100 p-6">
+                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Benefits</h2>
+                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.benefits}</p>
+              </div>
+            )}
+
+            {/* Application Form */}
+            {showApply && !applied && (
+              <div className="bg-white rounded-xl border-2 border-[#C9B97A]/30 p-6" id="apply-form">
+                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Apply for {job.title}</h2>
+                <form onSubmit={handleApply} className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">First Name *</label><input required value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Last Name *</label><input required value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Email *</label><input required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                  </div>
+                  <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Why are you interested? (Optional)</label><textarea rows={4} value={form.coverLetter} onChange={e => setForm({...form, coverLetter: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A] resize-none" /></div>
+                  <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-body font-semibold text-white transition-all hover:shadow-lg disabled:opacity-50" style={{ backgroundColor: '#C9B97A' }}>
+                    {submitting ? 'Submitting...' : 'Submit Application'}
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {applied && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+                <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
+                <h3 className="font-display text-lg font-semibold text-green-800">Application Submitted!</h3>
+                <p className="text-sm text-green-600 font-body mt-2">We'll review your application and get back to you soon.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-100 p-6 sticky top-20">
+              <h3 className="font-display text-base font-semibold mb-4" style={{ color: '#2C3E2D' }}>Job Details</h3>
+              <div className="space-y-3 text-sm font-body">
+                <div className="flex justify-between"><span className="text-gray-400">Compensation</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{job.salary_range || 'Competitive'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Type</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{formatEnum(job.job_type || '')}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Work Mode</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{formatEnum(job.work_mode || 'On Site')}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Category</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{job.category || 'General'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Location</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{job.location || 'Okeechobee, FL'}</span></div>
+              </div>
+              {!applied && (
+                <button onClick={() => { setShowApply(true); setTimeout(() => document.getElementById('apply-form')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="w-full mt-6 py-3 rounded-full text-sm font-body font-semibold text-white transition-all hover:shadow-lg" style={{ backgroundColor: '#C9B97A' }}>Apply Now</button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="space-y-6">
-          <div className="bg-white rounded-sm border border-gray-100 p-6"><h3 className="font-display text-base font-semibold text-brand-forest mb-4">Position Details</h3><div className="space-y-4">
-            <div className="flex items-start gap-3"><DollarSign className="w-4 h-4 text-brand-sage mt-0.5 shrink-0" /><div><p className="text-xs font-body text-brand-muted uppercase">Compensation</p><p className="text-sm font-body font-medium">{s(job,'salary_range')||'Contact for details'}</p></div></div>
-            <div className="flex items-start gap-3"><Briefcase className="w-4 h-4 text-brand-sage mt-0.5 shrink-0" /><div><p className="text-xs font-body text-brand-muted uppercase">Type</p><p className="text-sm font-body font-medium">{s(job,'compensation_type')||s(job,'job_type')||'Full-time'}</p></div></div>
-            <div className="flex items-start gap-3"><MapPin className="w-4 h-4 text-brand-sage mt-0.5 shrink-0" /><div><p className="text-xs font-body text-brand-muted uppercase">Location</p><p className="text-sm font-body font-medium">{s(job,'location')||'Lakefront Estates'}</p></div></div>
-            <div className="flex items-start gap-3"><Clock className="w-4 h-4 text-brand-sage mt-0.5 shrink-0" /><div><p className="text-xs font-body text-brand-muted uppercase">Status</p><p className="text-sm font-body font-medium">{statusLabel}</p></div></div>
-          </div></div>
-          <Link href="/auth/login?redirect=/applicant/jobs" className="btn-primary w-full text-center block">Sign In to Apply</Link>
-        </div>
-      </div></div></section>
-    </>
+      </div>
+    </div>
   );
 }
