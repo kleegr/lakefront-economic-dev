@@ -1,13 +1,10 @@
 // GHL Job Sync — 2-way sync: Supabase lf_jobs ↔ GHL Custom Object "Job Openings"
 // Schema: custom_objects.job_openings
 //
-// CONFIRMED WORKING FIELD KEYS:
+// CONFIRMED WORKING FIELD KEYS (16 total):
 // job_title, company__employer, location, category, job_type, work_mode,
-// salary_range, compensation_type, department, requirements, benefits,
-// special_offer, closing_date, openings_count, supabase_id
-//
-// DROPDOWNS (lowercase values): status, visibility
-// RESERVED/BROKEN: description (use requirements to hold combined text)
+// salary_range, compensation_type, department, job_details (description),
+// requirements, benefits, special_offer, closing_date, openings_count, supabase_id
 import { ghlConfig, isGhlConfigured } from './config';
 
 const SCHEMA_KEY = 'custom_objects.job_openings';
@@ -44,9 +41,9 @@ export interface JobSyncData {
   application_count?: number | null;
 }
 
-// Map Supabase job → GHL Custom Object properties (ONLY confirmed working keys)
+// Map Supabase job → GHL Custom Object properties
 function jobToGhlProperties(job: JobSyncData): Record<string, any> {
-  const props: Record<string, any> = {
+  return {
     job_title: job.title || '',
     company__employer: job.company_name || '',
     location: job.location || 'Lakefront Estates, Okeechobee, FL',
@@ -56,39 +53,25 @@ function jobToGhlProperties(job: JobSyncData): Record<string, any> {
     salary_range: job.salary_range || '',
     compensation_type: (job.compensation_type || 'salary').toLowerCase(),
     department: job.department || '',
-    // "description" is reserved in GHL — combine description + requirements
-    requirements: [
-      job.description || '',
-      job.requirements ? '\n\n--- Requirements ---\n' + job.requirements : '',
-    ].join('').trim(),
+    job_details: job.description || '',
+    requirements: job.requirements || '',
     benefits: job.benefits || '',
     special_offer: job.special_offer || '',
     closing_date: job.closing_date || '',
     openings_count: job.openings_count || 1,
     supabase_id: job.id,
   };
-  return props;
 }
 
 // Map GHL properties → Supabase job
 export function ghlPropertiesToJob(props: Record<string, any>): Partial<JobSyncData> {
-  // Split combined requirements field back into description + requirements
-  const combined = props.requirements || '';
-  const splitIdx = combined.indexOf('\n\n--- Requirements ---\n');
-  let desc = combined;
-  let reqs = '';
-  if (splitIdx > -1) {
-    desc = combined.substring(0, splitIdx);
-    reqs = combined.substring(splitIdx + '\n\n--- Requirements ---\n'.length);
-  }
-
   return {
     id: props.supabase_id || '',
     title: props.job_title || '',
     company_name: props.company__employer || '',
     location: props.location || '',
-    description: desc,
-    requirements: reqs,
+    description: props.job_details || '',
+    requirements: props.requirements || '',
     category: props.category || 'General',
     job_type: props.job_type || 'full-time',
     work_mode: props.work_mode || 'on_site',
