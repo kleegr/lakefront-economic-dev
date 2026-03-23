@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, TrendingUp, Warehouse, FileEdit, Users, Settings, Search, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, Eye, ScrollText, Home, MessageSquare, Store, Key } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, FileEdit, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, Eye, ScrollText, Home, MessageSquare, Store, Key, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { label:'Dashboard', href:'/portal/dashboard', icon:LayoutDashboard },
+  { label:'Portal Preview', href:'/portal/preview', icon:Monitor },
   { label:'Approvals', href:'/portal/approvals', icon:ClipboardCheck },
   { label:'Jobs', href:'/portal/jobs', icon:Briefcase },
   { label:'Applications', href:'/portal/applications', icon:FileText },
@@ -83,6 +84,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center gap-3"><button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700"><Menu className="w-5 h-5" /></button></div>
           <div className="flex items-center gap-3">
             {pendingCount > 0 && <Link href="/portal/approvals" className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-body font-semibold"><ClipboardCheck className="w-3.5 h-3.5" />{pendingCount} pending</Link>}
+            <Link href="/portal/preview" className="text-xs font-body text-brand-sage hover:text-brand-forest flex items-center gap-1"><Monitor className="w-3.5 h-3.5" /> Preview</Link>
             <Link href="/" className="text-xs font-body text-brand-muted hover:text-brand-forest flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Site</Link>
             <button className="relative p-2 text-gray-400 hover:text-gray-600"><Bell className="w-5 h-5" />{pendingCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />}</button>
           </div>
