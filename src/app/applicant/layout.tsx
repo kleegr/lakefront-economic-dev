@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Home, Users, FileText, Briefcase, Heart, Settings, LogOut, User, ChevronDown } from 'lucide-react';
+import { Home, Users, FileText, Briefcase, Heart, Settings, LogOut, User, ChevronDown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HouseholdContext, HouseholdMember } from '@/lib/household-context';
 
@@ -13,6 +13,7 @@ const NAV = [
   { label:'Browse Jobs', href:'/applicant/jobs', icon:Briefcase },
   { label:'Saved Jobs', href:'/applicant/saved', icon:Heart },
   { label:'Applications', href:'/applicant/applications', icon:FileText },
+  { label:'Resume Builder', href:'/applicant/resume', icon:Sparkles },
   { label:'Settings', href:'/applicant/settings', icon:Settings },
 ];
 
@@ -34,24 +35,19 @@ export default function ApplicantLayout({ children }: { children: React.ReactNod
     setUser({ name: p?.full_name || p?.email || au.email || '', email: p?.email || au.email || '', id: au.id });
     setApproved(p?.account_status === 'approved');
     let { data: hh } = await supabase.from('lf_households').select('*').eq('account_id', au.id).maybeSingle();
-    if (!hh) {
-      const { data: newHh } = await supabase.from('lf_households').insert({ account_id: au.id }).select().single();
-      hh = newHh;
-    }
+    if (!hh) { const { data: newHh } = await supabase.from('lf_households').insert({ account_id: au.id }).select().single(); hh = newHh; }
     setHousehold(hh);
     if (hh) {
       const { data: mems } = await supabase.from('lf_household_members').select('id, full_name, is_primary, profile_complete').eq('household_id', hh.id).order('is_primary', { ascending: false });
       const m = (mems || []) as HouseholdMember[];
       setMembers(m);
       const stored = typeof window !== 'undefined' ? localStorage.getItem('lf_active_member') : null;
-      const found = stored ? m.find(x => x.id === stored) : null;
-      setActiveMember(found || m[0] || null);
+      setActiveMember((stored ? m.find(x => x.id === stored) : null) || m[0] || null);
     }
     setLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
-
   const handleSetActive = (m: HouseholdMember) => { setActiveMember(m); localStorage.setItem('lf_active_member', m.id); setShowSwitcher(false); };
   const handleLogout = async () => { const s = createClient(); await s.auth.signOut(); window.location.replace('/auth/login'); };
 
