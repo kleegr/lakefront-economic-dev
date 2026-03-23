@@ -1,15 +1,11 @@
 // GHL Job Sync Service — 2-way sync between Supabase lf_jobs and GHL Companies
-// Jobs are stored as GHL Companies with 'Job:' prefix and custom fields
 import { ghl } from './client';
 import { ghlConfig, isGhlConfigured } from './config';
 
-// Field key map — these are the GHL custom field IDs we provisioned
-// We use the Co: prefixed contact fields since GHL company custom fields
-// map to contact model. For jobs we'll use company name + tags.
 const JOB_TAG = 'lakefront-job';
 
 export interface JobSyncData {
-  id: string; // Supabase ID
+  id: string;
   title: string;
   company_name?: string;
   location?: string;
@@ -27,21 +23,24 @@ export interface JobSyncData {
   closing_date?: string;
   special_offer?: string;
   openings_count?: number;
+  ghl_record_id?: string;
 }
 
 /**
- * Sync a job from Supabase → GHL Company
- * Creates or updates a GHL Company record representing this job
+ * Sync a job from Supabase → GHL Contact (with Job: prefix)
+ * We use Contacts instead of Companies because GHL's Companies API
+ * has limited search/create support via the private integration token.
+ * Each job becomes a Contact with type "job_posting" and all details in custom fields.
  */
 export async function syncJobToGhl(job: JobSyncData): Promise<{ ghlCompanyId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { ghlCompanyId: null, success: false, error: 'GHL not configured' };
 
   try {
-    // Build company name: "Job: {title} — {company}" to make it identifiable in GHL
-    const companyName = `Job: ${job.title}${job.company_name ? ` — ${job.company_name}` : ''}`;
+    const contactName = `Job: ${job.title}`;
+    const companyField = job.company_name || 'Lakefront Estates';
 
-    // Build description with all job data for GHL
-    const descriptionParts = [
+    // Build a notes field with all job details
+    const notesParts = [
       job.description || '',
       '',
       '--- Job Details ---',
@@ -50,46 +49,65 @@ export async function syncJobToGhl(job: JobSyncData): Promise<{ ghlCompanyId: st
       `Work Mode: ${job.work_mode || 'on_site'}`,
       `Compensation: ${job.salary_range || 'Competitive'} (${job.compensation_type || 'salary'})`,
       `Department: ${job.department || 'N/A'}`,
+      `Location: ${job.location || 'Lakefront Estates, Okeechobee, FL'}`,
       `Status: ${job.status || 'draft'}`,
       `Visibility: ${job.visibility || 'public'}`,
       `Openings: ${job.openings_count || 1}`,
       job.closing_date ? `Closing: ${job.closing_date}` : '',
       job.special_offer ? `Special Offer: ${job.special_offer}` : '',
       '',
-      job.requirements ? `Requirements: ${job.requirements}` : '',
-      job.benefits ? `Benefits: ${job.benefits}` : '',
+      job.requirements ? `Requirements:\n${job.requirements}` : '',
+      job.benefits ? `Benefits:\n${job.benefits}` : '',
       '',
       `[Supabase ID: ${job.id}]`,
     ].filter(Boolean).join('\n');
 
-    // Check if company already exists by searching
-    let ghlCompanyId: string | null = null;
-    try {
-      const existing = await ghl.getCompanies({ search: `Job: ${job.title}` });
-      const companies = existing?.companies || [];
-      const match = companies.find((c: any) =>
-        c.name === companyName || c.tags?.includes(JOB_TAG)
-      );
-      if (match) ghlCompanyId = match.id;
-    } catch { /* search failed, will create new */ }
-
-    const companyData: Record<string, any> = {
-      name: companyName,
-      description: descriptionParts,
+    const contactData: Record<string, any> = {
+      firstName: 'Job',
+      lastName: job.title,
+      companyName: companyField,
+      source: 'Lakefront Portal - Job Posting',
+      tags: [JOB_TAG, job.category || 'General', job.status || 'draft'].filter(Boolean),
       website: job.status === 'published' ? `https://lakefront-economic-dev.vercel.app/jobs/${job.id}` : '',
-      tags: [JOB_TAG, job.category || 'General', job.status || 'draft'],
+      customField: {
+        contact_type: 'Job Posting',
+      },
     };
 
-    if (ghlCompanyId) {
-      // Update existing
-      await ghl.updateCompany(ghlCompanyId, companyData);
-    } else {
-      // Create new
-      const result = await ghl.createCompany(companyData);
-      ghlCompanyId = result?.company?.id || null;
+    let ghlContactId: string | null = job.ghl_record_id || null;
+
+    if (ghlContactId) {
+      // Update existing contact
+      try {
+        await ghl.updateContact(ghlContactId, contactData);
+      } catch (updateErr: any) {
+        console.error('GHL update failed, creating new:', updateErr?.message);
+        ghlContactId = null; // Fall through to create
+      }
     }
 
-    return { ghlCompanyId, success: true };
+    if (!ghlContactId) {
+      // Create new contact
+      const result = await ghl.createContact(contactData);
+      ghlContactId = result?.contact?.id || null;
+    }
+
+    // Add a note with all job details
+    if (ghlContactId) {
+      try {
+        await ghl.request(`/contacts/${ghlContactId}/notes`, {
+          method: 'POST',
+          body: {
+            body: notesParts,
+            userId: ghlConfig.locationId, // required by GHL
+          },
+        });
+      } catch {
+        // Notes API may not be available, non-critical
+      }
+    }
+
+    return { ghlCompanyId: ghlContactId, success: true };
   } catch (err: any) {
     console.error('syncJobToGhl failed:', err);
     return { ghlCompanyId: null, success: false, error: err?.message || String(err) };
@@ -97,56 +115,27 @@ export async function syncJobToGhl(job: JobSyncData): Promise<{ ghlCompanyId: st
 }
 
 /**
- * Parse a GHL Company back into Supabase job data
- * Used for GHL → Supabase sync
+ * Parse a GHL Contact back into job data (for GHL → Supabase sync)
  */
-export function parseGhlCompanyToJob(company: any): Partial<JobSyncData> | null {
-  if (!company?.name?.startsWith('Job: ')) return null;
-  if (!company.tags?.includes(JOB_TAG)) return null;
-
-  const desc = company.description || '';
-  const getField = (label: string): string => {
-    const match = desc.match(new RegExp(`${label}: (.+)`));
-    return match ? match[1].trim() : '';
-  };
-
-  // Extract title from company name: "Job: Title — Company"
-  const nameParts = company.name.replace('Job: ', '').split(' — ');
-  const title = nameParts[0] || '';
-  const companyName = nameParts[1] || '';
-
-  // Extract Supabase ID
-  const idMatch = desc.match(/\[Supabase ID: ([a-f0-9-]+)\]/);
+export function parseGhlCompanyToJob(contact: any): Partial<JobSyncData> | null {
+  if (!contact?.firstName || contact.firstName !== 'Job') return null;
+  if (!contact.tags?.includes(JOB_TAG)) return null;
 
   return {
-    id: idMatch ? idMatch[1] : '',
-    title,
-    company_name: companyName,
-    category: getField('Category') || 'General',
-    job_type: getField('Type') || 'full-time',
-    work_mode: getField('Work Mode') || 'on_site',
-    salary_range: getField('Compensation')?.split(' (')[0] || '',
-    compensation_type: getField('Compensation')?.match(/\((.+)\)/)?.[1] || 'salary',
-    department: getField('Department') !== 'N/A' ? getField('Department') : '',
-    status: getField('Status') || 'draft',
-    visibility: getField('Visibility') || 'public',
-    closing_date: getField('Closing') || undefined,
-    special_offer: getField('Special Offer') || '',
-    description: desc.split('--- Job Details ---')[0]?.trim() || '',
-    requirements: getField('Requirements') || '',
-    benefits: getField('Benefits') || '',
+    title: contact.lastName || '',
+    company_name: contact.companyName || '',
   };
 }
 
 /**
- * Fetch all job companies from GHL
+ * Fetch all job contacts from GHL
  */
 export async function fetchJobsFromGhl(): Promise<any[]> {
   if (!isGhlConfigured()) return [];
   try {
-    const result = await ghl.getCompanies({ search: 'Job:' });
-    const companies = result?.companies || [];
-    return companies.filter((c: any) => c.tags?.includes(JOB_TAG));
+    const result = await ghl.getContacts({ query: 'Job', limit: '100' });
+    const contacts = result?.contacts || [];
+    return contacts.filter((c: any) => c.tags?.includes(JOB_TAG));
   } catch {
     return [];
   }
