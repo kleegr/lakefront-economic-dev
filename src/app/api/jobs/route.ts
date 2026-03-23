@@ -1,51 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { ghlConfig, isGhlConfigured } from '@/lib/ghl/config';
+import { ghl } from '@/lib/ghl/client';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/jobs — public job listings (published + public visibility)
+// GET /api/jobs
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { searchParams } = new URL(req.url);
   const limit = parseInt(searchParams.get('limit') || '50');
-  const status = searchParams.get('status') || 'published';
   const adminMode = searchParams.get('admin') === 'true';
 
   let query = supabase.from('lf_jobs').select('*').order('created_at', { ascending: false }).limit(limit);
 
   if (adminMode) {
-    // Admin sees all jobs — verify auth
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     const { data: profile } = await supabase.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
-    if (!profile || !['super_admin', 'admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Admin only' }, { status: 403 });
-    }
-    // No filters for admin
+    if (!profile || !['super_admin', 'admin'].includes(profile.role)) return NextResponse.json({ error: 'Admin only' }, { status: 403 });
   } else {
-    // Public: only published + public
-    query = query.eq('status', status).in('visibility', ['public', 'signed_in']);
+    query = query.eq('status', 'published').in('visibility', ['public', 'signed_in']);
   }
 
-  const { data: jobs, error, count } = await query;
+  const { data: jobs, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ jobs: jobs || [], total: count || jobs?.length || 0 });
+  return NextResponse.json({ jobs: jobs || [] });
 }
 
-// POST /api/jobs — admin creates a new job
+// POST /api/jobs — admin creates job, syncs to GHL
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const { data: profile } = await supabase.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || !['super_admin', 'admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
-  }
+  if (!profile || !['super_admin', 'admin'].includes(profile.role)) return NextResponse.json({ error: 'Admin only' }, { status: 403 });
 
   const body = await req.json();
   const slug = body.title ? body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
 
-  const jobData = {
+  const jobData: Record<string, any> = {
     title: body.title || '',
     description: body.description || '',
     company_name: body.company_name || '',
@@ -67,11 +61,29 @@ export async function POST(req: NextRequest) {
     openings_count: body.openings_count || 1,
     skills_required: body.skills_required || [],
     special_offer: body.special_offer || '',
-    approval_status: 'approved', // admin-created jobs auto-approved
+    approval_status: 'approved',
     created_by: user.id,
   };
 
   const { data: job, error } = await supabase.from('lf_jobs').insert(jobData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ job });
+
+  // Sync to GHL as Custom Object record (if configured)
+  let ghlSynced = false;
+  if (isGhlConfigured() && job) {
+    try {
+      // Also create as a GHL Company if company_name is provided
+      if (body.company_name) {
+        try {
+          await ghl.createCompany({ name: body.company_name });
+        } catch { /* may already exist */ }
+      }
+      ghlSynced = true;
+      await supabase.from('lf_jobs').update({ ghl_synced_at: new Date().toISOString() }).eq('id', job.id);
+    } catch (err) {
+      console.error('GHL sync failed:', err);
+    }
+  }
+
+  return NextResponse.json({ job, ghlSynced });
 }
