@@ -1,5 +1,5 @@
 // EMPLOYEE APPLICATION FIELDS - Single source of truth
-// Maps: Supabase column <-> GHL contact custom field <-> Portal form
+// Maps: Supabase column <-> Kleegr contact custom field <-> Portal form
 
 export interface EmployeeFieldConfig {
   key: string;
@@ -14,6 +14,11 @@ export interface EmployeeFieldConfig {
 }
 
 export const EMPLOYEE_FIELDS: EmployeeFieldConfig[] = [
+  // --- Property Info (after contact info, before job preferences) ---
+  { key: 'lot_number', ghlKey: 'contact.lot_number', label: 'Lot Number', type: 'number', placeholder: 'e.g. 123', group: 'property' },
+  { key: 'signed_contract_date', ghlKey: 'contact.signed_contract_date', label: 'Signed Contract Date', type: 'date', group: 'property' },
+
+  // --- Job Preferences ---
   { key: 'desired_salary', ghlKey: 'contact.desired_salary', label: 'Desired Salary', type: 'currency', placeholder: '0.00', group: 'preferences' },
   { key: 'salary_min', ghlKey: 'contact.salary_min', label: 'Salary Minimum', type: 'currency', placeholder: '0.00', group: 'preferences' },
   { key: 'salary_max', ghlKey: 'contact.salary_max', label: 'Salary Maximum', type: 'currency', placeholder: '0.00', group: 'preferences' },
@@ -21,12 +26,18 @@ export const EMPLOYEE_FIELDS: EmployeeFieldConfig[] = [
   { key: 'preferred_job_types', ghlKey: 'contact.prefered_job_types', label: 'Preferred Job Types', type: 'multiselect', group: 'preferences', options: ['Full-Time', 'Part-Time', 'Contract', 'Seasonal', 'Internship'] },
   { key: 'preferred_industries', ghlKey: 'contact.prefered_industries', label: 'Preferred Industries', type: 'multiselect', group: 'preferences', options: ['Technology', 'Healthcare', 'Financial Services', 'Energy', 'Consumer Goods', 'Industrials', 'Real Estate', 'Telecommunications', 'E-Commerce & Retail', 'Logistics & Supply Chain', 'Construction & Engineering', 'Automotive', 'Hospitality', 'Media & Entertainment', 'Education', 'Agriculture', 'Chemicals', 'Environmental Services'] },
   { key: 'availability_start_date', ghlKey: 'contact.availability_start_date', label: 'Availability Date', type: 'date', group: 'preferences', placeholder: 'When can you start?' },
+
+  // --- Experience ---
   { key: 'years_of_experience', ghlKey: 'contact.years_of_experience', label: 'Years of Experience', type: 'text', placeholder: 'e.g. 5', group: 'experience' },
   { key: 'skills_qualifications', ghlKey: 'contact.skills_qualifications', label: 'Skills & Qualifications', type: 'textarea', colSpan: 2, placeholder: 'List your key skills, certifications, and qualifications...', group: 'experience' },
   { key: 'skills_summary', ghlKey: 'contact.skills_summary', label: 'Skills Summary', type: 'textarea', colSpan: 2, placeholder: 'Brief summary of your top skills...', group: 'experience' },
   { key: 'work_history_summary', ghlKey: 'contact.work_history_summary', label: 'Work History Summary', type: 'textarea', colSpan: 2, placeholder: 'Summarize your work history...', group: 'experience' },
+
+  // --- Application ---
   { key: 'cover_letter', ghlKey: 'contact.cover_letter', label: 'Cover Letter / Why are you interested?', type: 'textarea', colSpan: 2, placeholder: 'Tell us why you are interested in this position...', group: 'application' },
   { key: 'resume_url', ghlKey: 'contact.resume_file', label: 'Resume', type: 'file', placeholder: 'Upload your resume (PDF, DOC, DOCX)', group: 'application' },
+
+  // --- Admin ---
   { key: 'priority_score', ghlKey: 'contact.priority_score', label: 'Priority Score', type: 'select', group: 'admin', options: ['High', 'Medium', 'Low'] },
 ];
 
@@ -37,7 +48,7 @@ export function getFieldsByGroup(): Record<string, EmployeeFieldConfig[]> {
   for (const f of EMPLOYEE_FIELDS) { if (!groups[f.group]) groups[f.group] = []; groups[f.group].push(f); }
   return groups;
 }
-export const GROUP_LABELS: Record<string, string> = { preferences: 'Job Preferences', experience: 'Experience & Skills', application: 'Application Details', admin: 'Admin Only' };
+export const GROUP_LABELS: Record<string, string> = { property: 'Property Information', preferences: 'Job Preferences', experience: 'Experience & Skills', application: 'Application Details', admin: 'Admin Only' };
 
 export function appToGhlCustomFields(app: Record<string, any>, job: Record<string, any> | null, fieldIdMap: Record<string, string>): Array<{ id: string; field_value: string }> {
   const fields: Array<{ id: string; field_value: string }> = [];
