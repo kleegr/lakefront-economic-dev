@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, ArrowUpRight, ArrowDownLeft, Clock, Filter, AlertTriangle } from 'lucide-react';
 
 type Log = Record<string, any>;
@@ -12,24 +12,36 @@ export default function SyncStatusPage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [stats, setStats] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ status: '', entity_type: '', direction: '' });
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterEntity, setFilterEntity] = useState('');
+  const [filterDirection, setFilterDirection] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  async function load() {
-    const params = new URLSearchParams();
-    params.set('limit', '200');
-    if (filter.status) params.set('status', filter.status);
-    if (filter.entity_type) params.set('entity_type', filter.entity_type);
-    if (filter.direction) params.set('direction', filter.direction);
-    const res = await fetch(`/api/sync-log?${params}`);
-    const data = await res.json();
-    setLogs(data.logs || []);
-    setStats(data.stats || null);
+  const fetchData = useCallback(async (showSpinner?: boolean) => {
+    if (showSpinner) setRefreshing(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '200');
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterEntity) params.set('entity_type', filterEntity);
+      if (filterDirection) params.set('direction', filterDirection);
+      const res = await fetch(`/api/sync-log?${params}`);
+      const data = await res.json();
+      setLogs(data.logs || []);
+      setStats(data.stats || null);
+    } catch (e) { console.error('Failed to fetch sync logs:', e); }
     setLoading(false);
-  }
+    if (showSpinner) setRefreshing(false);
+  }, [filterStatus, filterEntity, filterDirection]);
 
-  useEffect(() => { load(); }, [filter.status, filter.entity_type, filter.direction]);
-  useEffect(() => { if (!autoRefresh) return; const interval = setInterval(load, 5000); return () => clearInterval(interval); }, [autoRefresh]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => fetchData(), 3000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchData]);
 
   const errorCount = stats?.errors_24h || 0;
 
@@ -43,8 +55,13 @@ export default function SyncStatusPage() {
           <p className="text-sm font-body text-gray-400 mt-1">Real-time view of all Kleegr sync operations - every move logged</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-xs font-body text-gray-500 cursor-pointer"><input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} className="rounded border-gray-300" />Auto-refresh</label>
-          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg text-xs font-body font-semibold hover:bg-gray-50"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+          <label className="flex items-center gap-2 text-xs font-body text-gray-500 cursor-pointer">
+            <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} className="rounded border-gray-300" />
+            Live (3s)
+          </label>
+          <button onClick={() => fetchData(true)} disabled={refreshing} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg text-xs font-body font-semibold hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+          </button>
         </div>
       </div>
 
@@ -69,10 +86,10 @@ export default function SyncStatusPage() {
       )}
 
       <div className="flex gap-2 flex-wrap">
-        <select value={filter.status} onChange={e => setFilter(f => ({...f, status: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Status</option><option value="success">Success</option><option value="error">Errors</option><option value="skipped">Skipped</option></select>
-        <select value={filter.entity_type} onChange={e => setFilter(f => ({...f, entity_type: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Types</option><option value="application">Employee/Application</option><option value="job">Job</option><option value="employer">Employer</option><option value="webhook_inbound">Webhook Inbound</option></select>
-        <select value={filter.direction} onChange={e => setFilter(f => ({...f, direction: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">{'Portal -> Kleegr'}</option><option value="inbound">{'Kleegr -> Portal'}</option></select>
-        {(filter.status || filter.entity_type || filter.direction) && (<button onClick={() => setFilter({ status: '', entity_type: '', direction: '' })} className="text-xs text-brand-forest font-body underline">Clear filters</button>)}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Status</option><option value="success">Success</option><option value="error">Errors</option><option value="skipped">Skipped</option></select>
+        <select value={filterEntity} onChange={e => setFilterEntity(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Types</option><option value="application">Employee/Application</option><option value="job">Job</option><option value="employer">Employer</option><option value="webhook_inbound">Webhook Inbound</option></select>
+        <select value={filterDirection} onChange={e => setFilterDirection(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">{'Portal -> Kleegr'}</option><option value="inbound">{'Kleegr -> Portal'}</option></select>
+        {(filterStatus || filterEntity || filterDirection) && (<button onClick={() => { setFilterStatus(''); setFilterEntity(''); setFilterDirection(''); }} className="text-xs text-brand-forest font-body underline">Clear filters</button>)}
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden">
