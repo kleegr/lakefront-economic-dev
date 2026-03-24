@@ -31,7 +31,6 @@ function LoginForm() {
         return;
       }
 
-      // Get profile to determine portal redirect
       const { data: profile } = await supabase
         .from('lf_profiles')
         .select('role, portal_type, account_status')
@@ -45,7 +44,6 @@ function LoginForm() {
         return;
       }
 
-      // Route based on portal_type
       let redirectTo = '/applicant/dashboard';
       if (profile) {
         if (['super_admin', 'admin'].includes(profile.role)) {
@@ -130,7 +128,7 @@ function LoginForm() {
                 <button onClick={() => setForgotMode(true)} className="text-xs font-body text-brand-sage hover:text-brand-forest">Forgot password?</button>
               </div>
               <button onClick={handleLogin} disabled={loading || !email || !password} className="w-full py-3 bg-brand-gold text-white font-display font-bold text-sm uppercase tracking-widest rounded-sm hover:bg-brand-gold/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">{loading ? 'Signing in...' : 'SIGN IN'}</button>
-              <p className="text-xs text-brand-muted font-body text-center">Access is by invitation only.</p>
+              <p className="text-xs text-brand-muted font-body text-center">Don&apos;t have an account? <Link href="/auth/signup" className="text-brand-sage hover:text-brand-forest font-semibold">Sign up</Link></p>
             </div>
           )}
         </div>
