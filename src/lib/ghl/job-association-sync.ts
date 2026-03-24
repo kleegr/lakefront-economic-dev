@@ -241,14 +241,28 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<{ ok: boolean; error?: string }> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return { ok: false, error: 'Missing config or IDs' };
   const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
-  const url = `${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`;
+  // Strip "custom_objects." prefix for association endpoint - GHL uses just the object key
+  const objectKey = sk.replace('custom_objects.', '');
   const body = { locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] };
-  try {
-    const res = await fetch(url, { method: 'POST', headers: h(), body: JSON.stringify(body) });
-    const responseText = await res.text().catch(() => '');
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 200)} | URL: ${url} | schemaKey: ${sk}` };
-    return { ok: true };
-  } catch (e: any) { return { ok: false, error: `Exception: ${e?.message || String(e)}` }; }
+
+  // Try multiple URL formats since GHL API is inconsistent
+  const urls = [
+    `${BASE}/objects/${objectKey}/records/${jobGhlRecordId}/associations`,
+    `${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`,
+    `${BASE}/custom-objects/${objectKey}/records/${jobGhlRecordId}/associations`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: h(), body: JSON.stringify(body) });
+      const responseText = await res.text().catch(() => '');
+      if (res.ok) return { ok: true };
+      if (res.status === 404) continue;
+      return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 200)} | URL: ${url}` };
+    } catch (e: any) { continue; }
+  }
+
+  return { ok: false, error: `All URL formats failed for association. Tried: ${urls.join(' | ')}` };
 }
 
 async function findContactByEmail(email: string): Promise<string | null> {
