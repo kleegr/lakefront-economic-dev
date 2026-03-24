@@ -1,11 +1,5 @@
 // Kleegr Contact Sync — creates/updates contacts with custom fields when applications come in
-// Custom folders created in Kleegr:
-//   General: Contact Type (Employee/Employer/Provider/Space Applicant)
-//   Employee Applicant: position_applied_for, desired_salary, work_mode_preference, years_of_experience,
-//     skills__qualifications, resume_url, cover_letter, availability_start_date, employee_app_status, supabase_application_id
-//   Employer: employer_company, contact_person, business_type_employer, business_website,
-//     business_description, number_of_jobs_to_post, years_in_business, employer_app_status, supabase_employer_id
-
+// Uses field IDs (not keys) for custom field values as required by GHL API
 import { ghlConfig, isGhlConfigured } from './config';
 
 const BASE_URL = 'https://services.leadconnectorhq.com';
@@ -18,7 +12,6 @@ function getHeaders() {
   };
 }
 
-// Map application_type to Kleegr Contact Type dropdown value
 const CONTACT_TYPE_MAP: Record<string, string> = {
   employee: 'Employee',
   employer: 'Employer',
@@ -36,11 +29,38 @@ interface ApplicationData {
   cover_letter?: string;
   status?: string;
   notes?: string;
-  // Parsed from cover_letter for structured data
   [key: string]: any;
 }
 
-// Search for existing contact by email
+// Cache field key -> ID mapping
+let fieldIdMap: Record<string, string> | null = null;
+
+async function getFieldIdMap(): Promise<Record<string, string>> {
+  if (fieldIdMap) return fieldIdMap;
+  if (!isGhlConfigured()) return {};
+  try {
+    const res = await fetch(`${BASE_URL}/locations/${ghlConfig.locationId}/customFields`, {
+      headers: { 'Authorization': `Bearer ${ghlConfig.token}`, 'Version': '2021-07-28' },
+    });
+    const data = await res.json();
+    const map: Record<string, string> = {};
+    for (const f of (data.customFields || [])) {
+      map[f.fieldKey] = f.id;
+    }
+    fieldIdMap = map;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Helper to build customFields array with IDs
+function cf(map: Record<string, string>, key: string, value: string): { id: string; field_value: string } | null {
+  const id = map[key];
+  if (!id || !value) return null;
+  return { id, field_value: value };
+}
+
 async function findContactByEmail(email: string): Promise<string | null> {
   if (!email || !isGhlConfigured()) return null;
   try {
@@ -56,14 +76,44 @@ async function findContactByEmail(email: string): Promise<string | null> {
   }
 }
 
-// Create or update a Kleegr contact from an application
 export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ contactId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { contactId: null, success: false, error: 'Kleegr not configured' };
-  
+
+  const map = await getFieldIdMap();
   const appType = app.application_type || 'employee';
-  
-  // Build base contact data
   const nameParts = (app.applicant_name || '').split(' ');
+
+  // Build custom fields array using IDs
+  const customFields: Array<{ id: string; field_value: string }> = [];
+  const addField = (key: string, value: string) => {
+    const entry = cf(map, key, value);
+    if (entry) customFields.push(entry);
+  };
+
+  // General field
+  addField('contact.contact_type', CONTACT_TYPE_MAP[appType] || 'Employee');
+  addField('contact.supabase_application_id', app.id);
+
+  if (appType === 'employee') {
+    addField('contact.cover_letter', app.cover_letter || '');
+    addField('contact.employee_app_status', 'Submitted');
+    if (app.position_applied_for) addField('contact.position_applied_for', app.position_applied_for);
+    if (app.desired_salary) addField('contact.desired_salary', app.desired_salary);
+    if (app.years_of_experience) addField('contact.years_of_experience', app.years_of_experience);
+    if (app.skills) addField('contact.skills__qualifications', app.skills);
+  } else if (appType === 'employer') {
+    addField('contact.employer_company', app.applicant_name || '');
+    addField('contact.employer_app_status', 'Submitted');
+    addField('contact.business_description', app.cover_letter || '');
+    addField('contact.supabase_employer_id', app.id);
+  } else if (appType === 'provider') {
+    addField('contact.cover_letter', app.cover_letter || '');
+    addField('contact.employee_app_status', 'Submitted');
+  } else if (appType === 'space_rental') {
+    addField('contact.cover_letter', app.cover_letter || '');
+    addField('contact.employee_app_status', 'Submitted');
+  }
+
   const contactData: Record<string, any> = {
     locationId: ghlConfig.locationId,
     firstName: nameParts[0] || '',
@@ -73,42 +123,17 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
     address1: app.address || '',
     source: 'Lakefront Portal',
     tags: [`lakefront-${appType}`, 'lakefront-applicant'],
-    customFields: [] as Array<{ key: string; field_value: string }>,
+    customFields,
   };
-  
-  // Set Contact Type
-  contactData.customFields.push({ key: 'contact.contact_type', field_value: CONTACT_TYPE_MAP[appType] || 'Employee' });
-  contactData.customFields.push({ key: 'contact.supabase_application_id', field_value: app.id });
-  
-  if (appType === 'employee') {
-    // Employee-specific fields
-    contactData.customFields.push({ key: 'contact.cover_letter', field_value: app.cover_letter || '' });
-    contactData.customFields.push({ key: 'contact.employee_app_status', field_value: 'Submitted' });
-    // Parse structured data from cover_letter if available
-    if (app.position_applied_for) contactData.customFields.push({ key: 'contact.position_applied_for', field_value: app.position_applied_for });
-    if (app.desired_salary) contactData.customFields.push({ key: 'contact.desired_salary', field_value: app.desired_salary });
-    if (app.years_of_experience) contactData.customFields.push({ key: 'contact.years_of_experience', field_value: app.years_of_experience });
-    if (app.skills) contactData.customFields.push({ key: 'contact.skills__qualifications', field_value: app.skills });
-  } else if (appType === 'employer') {
-    // Employer-specific fields
-    contactData.customFields.push({ key: 'contact.employer_company', field_value: app.applicant_name || '' });
-    contactData.customFields.push({ key: 'contact.employer_app_status', field_value: 'Submitted' });
-    contactData.customFields.push({ key: 'contact.business_description', field_value: app.cover_letter || '' });
-    if (app.applicant_name) contactData.companyName = app.applicant_name;
-  } else if (appType === 'provider') {
-    contactData.customFields.push({ key: 'contact.cover_letter', field_value: app.cover_letter || '' });
-    contactData.customFields.push({ key: 'contact.employee_app_status', field_value: 'Submitted' });
-  } else if (appType === 'space_rental') {
-    contactData.customFields.push({ key: 'contact.cover_letter', field_value: app.cover_letter || '' });
-    contactData.customFields.push({ key: 'contact.employee_app_status', field_value: 'Submitted' });
+
+  if (appType === 'employer' && app.applicant_name) {
+    contactData.companyName = app.applicant_name;
   }
 
   try {
-    // Check if contact already exists
     const existingId = await findContactByEmail(app.applicant_email || '');
-    
+
     if (existingId) {
-      // Update existing contact
       const res = await fetch(`${BASE_URL}/contacts/${existingId}`, {
         method: 'PUT',
         headers: getHeaders(),
@@ -118,7 +143,6 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
       if (!res.ok) return { contactId: existingId, success: false, error: JSON.stringify(data?.message || data) };
       return { contactId: existingId, success: true };
     } else {
-      // Create new contact
       const res = await fetch(`${BASE_URL}/contacts/`, {
         method: 'POST',
         headers: getHeaders(),
