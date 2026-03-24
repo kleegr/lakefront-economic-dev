@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, ArrowLeft, Briefcase, Clock, Building2, Send, CheckCircle } from 'lucide-react';
+import { MapPin, ArrowLeft, Briefcase, Clock, Building2, Send, CheckCircle, ChevronDown } from 'lucide-react';
+import { getPublicFormFields, GROUP_LABELS } from '@/lib/ghl/employee-fields';
 
-function formatEnum(s: string) {
-  return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
+function formatEnum(s: string) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+const formFields = getPublicFormFields();
+const fieldGroups: Record<string, typeof formFields> = {};
+for (const f of formFields) { if (!fieldGroups[f.group]) fieldGroups[f.group] = []; fieldGroups[f.group].push(f); }
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -17,43 +19,35 @@ export default function JobDetailPage() {
   const [showApply, setShowApply] = useState(false);
   const [applied, setApplied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', coverLetter: '' });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, application: true });
+  const [form, setForm] = useState<Record<string, any>>({ firstName: '', lastName: '', email: '', phone: '' });
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/jobs/${id}`)
-      .then(r => r.json())
-      .then(d => { setJob(d.job || null); setLoading(false); })
-      .catch(() => setLoading(false));
+    fetch(`/api/jobs/${id}`).then(r => r.json()).then(d => { setJob(d.job || null); setLoading(false); }).catch(() => setLoading(false));
   }, [id]);
 
+  const setField = (key: string, val: any) => setForm(prev => ({ ...prev, [key]: val }));
+
   async function handleApply(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
+    e.preventDefault(); setSubmitting(true);
     try {
-      const res = await fetch(`/api/jobs/${id}/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      if (res.ok) {
-        setApplied(true);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to submit');
-      }
-    } catch {
-      alert('Network error');
-    }
+      const payload: Record<string, any> = { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, coverLetter: form.cover_letter || '', resumeUrl: form.resume_url || '' };
+      for (const f of formFields) { if (form[f.key] !== undefined && form[f.key] !== '' && form[f.key] !== null) payload[f.key] = form[f.key]; }
+      const res = await fetch(`/api/jobs/${id}/apply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) setApplied(true);
+      else { const data = await res.json(); alert(data.error || 'Failed to submit'); }
+    } catch { alert('Network error'); }
     setSubmitting(false);
   }
+
+  const toggleGroup = (g: string) => setExpandedGroups(prev => ({ ...prev, [g]: !prev[g] }));
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7] pt-20"><div className="animate-spin h-8 w-8 border-4 border-[#C9B97A] border-t-transparent rounded-full" /></div>;
   if (!job) return <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7] pt-20"><p className="text-gray-400">Job not found</p></div>;
 
   return (
     <div className="bg-[#FAFAF7] min-h-screen">
-      {/* Hero */}
       <div className="gradient-forest">
         <div className="max-container section-padding pb-12">
           <Link href="/jobs" className="inline-flex items-center gap-1 text-white/40 hover:text-white/70 text-sm font-body mb-6 transition-colors"><ArrowLeft className="w-4 h-4" />Back to Jobs</Link>
@@ -72,44 +66,62 @@ export default function JobDetailPage() {
 
       <div className="max-container section-padding py-12">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main content */}
           <div className="lg:col-span-2 space-y-8">
-            {job.description && (
-              <div className="bg-white rounded-xl border border-gray-100 p-6">
-                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>About This Role</h2>
-                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.description}</p>
-              </div>
-            )}
-            {job.requirements && (
-              <div className="bg-white rounded-xl border border-gray-100 p-6">
-                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Requirements</h2>
-                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
-              </div>
-            )}
-            {job.benefits && (
-              <div className="bg-white rounded-xl border border-gray-100 p-6">
-                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Benefits</h2>
-                <p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.benefits}</p>
-              </div>
-            )}
+            {job.description && (<div className="bg-white rounded-xl border border-gray-100 p-6"><h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>About This Role</h2><p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.description}</p></div>)}
+            {job.requirements && (<div className="bg-white rounded-xl border border-gray-100 p-6"><h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Requirements</h2><p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.requirements}</p></div>)}
+            {job.benefits && (<div className="bg-white rounded-xl border border-gray-100 p-6"><h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Benefits</h2><p className="text-sm text-gray-500 font-body leading-relaxed whitespace-pre-wrap">{job.benefits}</p></div>)}
 
-            {/* Application Form */}
             {showApply && !applied && (
               <div className="bg-white rounded-xl border-2 border-[#C9B97A]/30 p-6" id="apply-form">
-                <h2 className="font-display text-lg font-semibold mb-4" style={{ color: '#2C3E2D' }}>Apply for {job.title}</h2>
-                <form onSubmit={handleApply} className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">First Name *</label><input required value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
-                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Last Name *</label><input required value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                <h2 className="font-display text-lg font-semibold mb-6" style={{ color: '#2C3E2D' }}>Apply for {job.title}</h2>
+                <form onSubmit={handleApply} className="space-y-6">
+                  <div>
+                    <p className="text-[10px] font-body font-semibold uppercase tracking-[0.15em] text-gray-300 mb-3">Contact Information</p>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">First Name *</label><input required value={form.firstName || ''} onChange={e => setField('firstName', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                      <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Last Name *</label><input required value={form.lastName || ''} onChange={e => setField('lastName', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                      <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Email *</label><input required type="email" value={form.email || ''} onChange={e => setField('email', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                      <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Phone</label><input value={form.phone || ''} onChange={e => setField('phone', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
+                    </div>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Email *</label><input required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
-                    <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" /></div>
-                  </div>
-                  <div><label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">Why are you interested? (Optional)</label><textarea rows={4} value={form.coverLetter} onChange={e => setForm({...form, coverLetter: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A] resize-none" /></div>
+
+                  {Object.entries(fieldGroups).map(([groupKey, fields]) => (
+                    <div key={groupKey}>
+                      <button type="button" onClick={() => toggleGroup(groupKey)} className="flex items-center justify-between w-full mb-3">
+                        <p className="text-[10px] font-body font-semibold uppercase tracking-[0.15em] text-gray-300">{GROUP_LABELS[groupKey] || groupKey}</p>
+                        <ChevronDown className={`w-4 h-4 text-gray-300 transition-transform ${expandedGroups[groupKey] ? 'rotate-180' : ''}`} />
+                      </button>
+                      {expandedGroups[groupKey] && (
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          {fields.map(field => (
+                            <div key={field.key} className={field.colSpan === 2 ? 'sm:col-span-2' : ''}>
+                              <label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">{field.label}{field.required ? ' *' : ''}</label>
+                              {field.type === 'select' ? (
+                                <select value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]"><option value="">Select...</option>{(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
+                              ) : field.type === 'multiselect' ? (
+                                <div className="flex flex-wrap gap-1.5 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto">
+                                  {(field.options || []).map(opt => (
+                                    <button key={opt} type="button" onClick={() => { const cur = form[field.key] || []; setField(field.key, cur.includes(opt) ? cur.filter((x: string) => x !== opt) : [...cur, opt]); }} className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-colors ${(form[field.key] || []).includes(opt) ? 'bg-[#2C3E2D] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{opt}</button>
+                                  ))}
+                                </div>
+                              ) : field.type === 'textarea' ? (
+                                <textarea rows={3} value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A] resize-none" placeholder={field.placeholder} />
+                              ) : field.type === 'date' ? (
+                                <input type="date" value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" />
+                              ) : field.type === 'number' ? (
+                                <input type="number" value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value ? parseFloat(e.target.value) : '')} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" placeholder={field.placeholder} />
+                              ) : (
+                                <input type="text" value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-[#C9B97A]" placeholder={field.placeholder} />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
                   <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-body font-semibold text-white transition-all hover:shadow-lg disabled:opacity-50" style={{ backgroundColor: '#C9B97A' }}>
-                    {submitting ? 'Submitting...' : 'Submit Application'}
-                    <Send className="w-4 h-4" />
+                    {submitting ? 'Submitting...' : 'Submit Application'}<Send className="w-4 h-4" />
                   </button>
                 </form>
               </div>
@@ -124,7 +136,6 @@ export default function JobDetailPage() {
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-gray-100 p-6 sticky top-20">
               <h3 className="font-display text-base font-semibold mb-4" style={{ color: '#2C3E2D' }}>Job Details</h3>
@@ -136,7 +147,7 @@ export default function JobDetailPage() {
                 <div className="flex justify-between"><span className="text-gray-400">Location</span><span className="font-semibold" style={{ color: '#2C3E2D' }}>{job.location || 'Okeechobee, FL'}</span></div>
               </div>
               {!applied && (
-                <button onClick={() => { setShowApply(true); setTimeout(() => document.getElementById('apply-form')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="w-full mt-6 py-3 rounded-full text-sm font-body font-semibold text-white transition-all hover:shadow-lg" style={{ backgroundColor: '#C9B97A' }}>Apply Now</button>
+                <button onClick={() => { setShowApply(true); setExpandedGroups({ preferences: true, application: true, experience: false }); setTimeout(() => document.getElementById('apply-form')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="w-full mt-6 py-3 rounded-full text-sm font-body font-semibold text-white transition-all hover:shadow-lg" style={{ backgroundColor: '#C9B97A' }}>Apply Now</button>
               )}
             </div>
           </div>
