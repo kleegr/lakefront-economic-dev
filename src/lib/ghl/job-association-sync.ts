@@ -57,7 +57,15 @@ export async function syncJobWithEmployer(job: Record<string, any>, _employer: a
     if (employerGhlContactId) {
       const associated = await associateContactToJob(result.ghlRecordId, employerGhlContactId);
       if (associated) {
-        console.log(`Associated employer contact ${employerGhlContactId} to job ${result.ghlRecordId}`);
+        await logSyncSuccess('job', 'employer_associated', {
+          entity_id: job.id, ghl_id: result.ghlRecordId,
+          details: { title: job.title, contactId: employerGhlContactId, company: job.company_name },
+        });
+      } else {
+        await logSyncError('job', 'employer_association_failed', 'Association API call failed', {
+          entity_id: job.id, ghl_id: result.ghlRecordId,
+          details: { title: job.title, contactId: employerGhlContactId, company: job.company_name },
+        });
       }
     }
   }
@@ -107,7 +115,6 @@ export async function syncEmployeeToJob(
     } catch (e) { console.error('Opportunity sync failed:', e); }
   }
 
-  // EMPLOYEE contacts DO get associated to Job Openings
   if (contactId && job?.ghl_record_id) await associateContactToJob(job.ghl_record_id, contactId);
 
   if (contactId) {
@@ -236,12 +243,15 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<boolean> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return false;
   const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
+  const url = `${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`;
+  const body = { locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] };
   try {
-    const res = await fetch(`${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`, {
-      method: 'POST', headers: h(),
-      body: JSON.stringify({ locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] })
-    });
-    if (!res.ok) { console.error('Association failed:', res.status, await res.text().catch(() => '')); return false; }
+    console.log(`Association API: POST ${url}`);
+    console.log(`Association body:`, JSON.stringify(body));
+    const res = await fetch(url, { method: 'POST', headers: h(), body: JSON.stringify(body) });
+    const responseText = await res.text().catch(() => '');
+    console.log(`Association response: ${res.status} ${responseText.substring(0, 500)}`);
+    if (!res.ok) return false;
     return true;
   } catch (e) { console.error('Association error:', e); return false; }
 }
