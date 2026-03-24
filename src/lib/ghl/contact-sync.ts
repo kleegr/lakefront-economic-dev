@@ -1,5 +1,6 @@
 // Kleegr Contact Sync — creates/updates contacts with custom fields when applications come in
 // Uses field IDs (not keys) for custom field values as required by GHL API
+// For EMPLOYER applications: creates BOTH a contact AND a job opening in Kleegr
 import { ghlConfig, isGhlConfigured } from './config';
 
 const BASE_URL = 'https://services.leadconnectorhq.com';
@@ -76,6 +77,25 @@ async function findContactByEmail(email: string): Promise<string | null> {
   }
 }
 
+// Parse employer cover letter to extract structured fields
+function parseEmployerFields(coverLetter: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  const lines = (coverLetter || '').split('\n');
+  for (const line of lines) {
+    const [key, ...rest] = line.split(':');
+    const val = rest.join(':').trim();
+    if (!val) continue;
+    const k = key.trim().toLowerCase();
+    if (k === 'company') fields.company = val;
+    else if (k === 'contact') fields.contact = val;
+    else if (k === 'business type') fields.businessType = val;
+    else if (k === 'website') fields.website = val;
+    else if (k === 'jobs to post') fields.jobsToPost = val;
+    else if (k === 'years in business') fields.yearsInBusiness = val;
+  }
+  return fields;
+}
+
 export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ contactId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { contactId: null, success: false, error: 'Kleegr not configured' };
 
@@ -102,10 +122,19 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
     if (app.years_of_experience) addField('contact.years_of_experience', app.years_of_experience);
     if (app.skills) addField('contact.skills__qualifications', app.skills);
   } else if (appType === 'employer') {
-    addField('contact.employer_company', app.applicant_name || '');
+    // Parse structured fields from cover letter
+    const parsed = parseEmployerFields(app.cover_letter || '');
+    addField('contact.employer_company', parsed.company || app.applicant_name || '');
+    addField('contact.contact_person', parsed.contact || '');
+    addField('contact.business_type_employer', parsed.businessType || '');
+    addField('contact.business_website', parsed.website || '');
+    addField('contact.number_of_jobs_to_post', parsed.jobsToPost || '');
+    addField('contact.years_in_business', parsed.yearsInBusiness || '');
     addField('contact.employer_app_status', 'Submitted');
-    addField('contact.business_description', app.cover_letter || '');
     addField('contact.supabase_employer_id', app.id);
+    // Business description is the full cover letter minus the structured header
+    const descLines = (app.cover_letter || '').split('\n').filter(l => !l.match(/^(Company|Contact|Business Type|Website|Jobs to Post|Years in Business):/i));
+    addField('contact.business_description', descLines.join('\n').trim());
   } else if (appType === 'provider') {
     addField('contact.cover_letter', app.cover_letter || '');
     addField('contact.employee_app_status', 'Submitted');
@@ -133,6 +162,7 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
   try {
     const existingId = await findContactByEmail(app.applicant_email || '');
 
+    let contactId: string | null = null;
     if (existingId) {
       const res = await fetch(`${BASE_URL}/contacts/${existingId}`, {
         method: 'PUT',
@@ -141,7 +171,7 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
       });
       const data = await res.json();
       if (!res.ok) return { contactId: existingId, success: false, error: JSON.stringify(data?.message || data) };
-      return { contactId: existingId, success: true };
+      contactId = existingId;
     } else {
       const res = await fetch(`${BASE_URL}/contacts/`, {
         method: 'POST',
@@ -150,9 +180,69 @@ export async function syncApplicationToKleegr(app: ApplicationData): Promise<{ c
       });
       const data = await res.json();
       if (!res.ok) return { contactId: null, success: false, error: JSON.stringify(data?.message || data) };
-      return { contactId: data?.contact?.id || null, success: true };
+      contactId = data?.contact?.id || null;
     }
+
+    // For EMPLOYER applications: also create a Job Opening in Kleegr Custom Object
+    if (appType === 'employer' && contactId) {
+      try {
+        const parsed = parseEmployerFields(app.cover_letter || '');
+        await createEmployerJobOpening(contactId, app, parsed);
+      } catch (jobErr: any) {
+        // Don't fail the whole sync if job creation fails
+        console.error('Failed to create employer job opening:', jobErr?.message);
+      }
+    }
+
+    return { contactId, success: true };
   } catch (err: any) {
     return { contactId: null, success: false, error: err?.message || String(err) };
+  }
+}
+
+// Create a Job Opening record in Kleegr for employer applications
+async function createEmployerJobOpening(contactId: string, app: ApplicationData, parsed: Record<string, string>) {
+  if (!isGhlConfigured()) return;
+
+  // Search for the custom object schema ID for Job Openings
+  try {
+    const searchRes = await fetch(`${BASE_URL}/objects/records/search`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        locationId: ghlConfig.locationId,
+        schemaKey: 'job_openings',
+        page: 1,
+        pageLimit: 1,
+        searchTerm: '',
+      }),
+    });
+
+    // Create a new job opening record
+    const jobData: Record<string, any> = {
+      locationId: ghlConfig.locationId,
+      schemaKey: 'job_openings',
+      properties: {
+        job_title: `New Position - ${parsed.company || app.applicant_name || 'Unknown'}`,
+        company___employer: parsed.company || app.applicant_name || '',
+        category: parsed.businessType || 'Other',
+        location: app.address || 'Okeechobee, FL',
+        job_details: `Employer application from ${parsed.company || app.applicant_name}. Jobs to post: ${parsed.jobsToPost || 'Not specified'}. ${parsed.contact ? 'Contact: ' + parsed.contact : ''}`,
+        status: 'draft',
+        supabase_id: app.id,
+      },
+      associations: [{
+        objectKey: 'contact',
+        recordId: contactId,
+      }],
+    };
+
+    await fetch(`${BASE_URL}/objects/records`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(jobData),
+    });
+  } catch {
+    // Silent fail - job opening creation is a best-effort
   }
 }
