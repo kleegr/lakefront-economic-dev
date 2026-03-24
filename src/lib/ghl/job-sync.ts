@@ -11,7 +11,13 @@ export function jobToGhlProperties(job: Record<string, any>, fields: FieldConfig
   const props: Record<string, any> = {};
   for (const f of fields) {
     if (!f.ghl_key) continue; const val = job[f.key];
-    if (f.field_type === 'dropdown' && f.options?.length) { const opt = f.options.find(o => o.value === val); if (opt) props[f.ghl_key] = opt.ghlLabel; else if (val) props[f.ghl_key] = String(val); else props[f.ghl_key] = ''; }
+    if (f.field_type === 'dropdown' && f.options?.length) {
+      // GHL custom object dropdown fields require an ARRAY of values
+      const opt = f.options.find(o => o.value === val);
+      if (opt) props[f.ghl_key] = [opt.ghlLabel];
+      else if (val) props[f.ghl_key] = [String(val)];
+      else props[f.ghl_key] = [];
+    }
     else if (f.field_type === 'date') { if (val) props[f.ghl_key] = val; }
     else if (f.field_type === 'number') { props[f.ghl_key] = val || 0; }
     else { props[f.ghl_key] = val || ''; }
