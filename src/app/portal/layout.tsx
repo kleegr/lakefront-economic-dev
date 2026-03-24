@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// ITEMS 5,15,16,17,26: Remove residents, Settings as page not dropdown, rename GHL to Kleegr, merge GHL Setup + Kleegr Integration
+// ITEM 28: Added Portal Preview to sidebar
 interface NavItem { label: string; href: string; icon: any; badge?: number; }
 interface NavGroup { title: string; items: NavItem[]; }
 
@@ -61,6 +61,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       title: 'Community',
       items: [
         { label: 'Feedback', href: '/portal/suggestions', icon: MessageSquare },
+        { label: 'Portal Preview', href: '/portal/preview', icon: Monitor },
       ],
     },
   ];
@@ -97,7 +98,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             </div>
           ))}
         </nav>
-        {/* ITEM 15: Settings as its own nav link, not dropdown */}
         <div className="px-3 pb-3 border-t border-white/[0.06] pt-3">
           <NavLink item={{ label: 'Settings', href: '/portal/settings', icon: Settings }} />
         </div>
