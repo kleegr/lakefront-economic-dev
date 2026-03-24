@@ -34,6 +34,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (body.status === 'published') updateData.posted_date = new Date().toISOString().split('T')[0];
   if (body.title) updateData.slug = body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+  // Handle employer link changes
+  if (body.employer_link) {
+    if (body.employer_link.ghl_contact_id) updateData.ghl_company_id = body.employer_link.ghl_contact_id;
+    if (body.employer_link.id && body.employer_link.source === 'profile') updateData.employer_id = body.employer_link.id;
+  } else if (body.clear_employer_link) {
+    // User typed a new name without selecting from dropdown - clear old association
+    updateData.ghl_company_id = null;
+    updateData.employer_id = null;
+  }
+
   const { data: job, error } = await supabase.from('lf_jobs').update(updateData).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
