@@ -12,8 +12,8 @@ interface DashboardData {
   appCount: number;
   userCount: number;
   pendingCount: number;
-  ghlConfigured: boolean;
-  ghlContacts: number;
+  kleegrConfigured: boolean;
+  kleegrContacts: number;
 }
 
 export default function DashboardPage() {
@@ -44,12 +44,12 @@ export default function DashboardPage() {
           appCount,
           userCount,
           pendingCount,
-          ghlConfigured: false,
-          ghlContacts: 0,
+          kleegrConfigured: false,
+          kleegrContacts: 0,
         });
       } catch (err) {
         console.error('Dashboard load error:', err);
-        setData({ jobs: [], jobCount: 0, applications: [], appCount: 0, userCount: 0, pendingCount: 0, ghlConfigured: false, ghlContacts: 0 });
+        setData({ jobs: [], jobCount: 0, applications: [], appCount: 0, userCount: 0, pendingCount: 0, kleegrConfigured: false, kleegrContacts: 0 });
       }
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export default function DashboardPage() {
     { label: 'Applications', value: data?.appCount || 0, icon: FileText, href: '/portal/applications', color: 'text-purple-600 bg-purple-50' },
     { label: 'Users', value: data?.userCount || 0, icon: Users, href: '/portal/users', color: 'text-green-600 bg-green-50' },
     { label: 'Pending', value: data?.pendingCount || 0, icon: Clock, href: '/portal/approvals', color: 'text-orange-600 bg-orange-50' },
-    { label: 'GHL Contacts', value: data?.ghlContacts || 0, icon: Plug, href: '/portal/ghl-setup', color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Kleegr Contacts', value: data?.kleegrContacts || 0, icon: Plug, href: '/portal/settings', color: 'text-emerald-600 bg-emerald-50' },
     { label: 'Spaces', value: 4, icon: Warehouse, href: '/portal/spaces', color: 'text-sky-600 bg-sky-50' },
   ];
 
@@ -108,7 +108,7 @@ export default function DashboardPage() {
               { label: 'Add Business', href: '/portal/businesses/new', icon: Building2 },
               { label: 'Review Applications', href: '/portal/applications', icon: FileText },
               { label: 'Manage Spaces', href: '/portal/spaces', icon: Warehouse },
-              { label: 'GHL Setup', href: '/portal/ghl-setup', icon: Plug },
+              { label: 'Kleegr Setup', href: '/portal/settings', icon: Plug },
               { label: 'Manage Users', href: '/portal/users', icon: Users },
             ].map(action => (
               <Link key={action.href} href={action.href} className="flex items-center gap-3 p-3.5 rounded-lg border border-gray-200 hover:bg-portal-hover hover:border-portal-accent/20 transition-all group">
@@ -126,7 +126,7 @@ export default function DashboardPage() {
           </div>
           <div className="divide-y divide-gray-50">
             {(data?.applications?.length || 0) === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-brand-muted font-body">No applications yet. They will appear here when applicants apply through GHL or the portal.</div>
+              <div className="px-5 py-8 text-center text-sm text-brand-muted font-body">No applications yet. They will appear here when applicants apply through Kleegr or the portal.</div>
             ) : (
               data?.applications?.slice(0, 5).map((app: any) => (
                 <div key={app.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
