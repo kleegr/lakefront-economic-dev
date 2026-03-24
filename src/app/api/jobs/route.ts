@@ -37,6 +37,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const slug = body.title ? body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
 
+  // Check if linking to an existing employer
+  const employerLink = body.employer_link || null;
+  let employerId = null;
+  let ghlCompanyId = null;
+
+  if (employerLink) {
+    // If source is 'profile', use the profile ID as employer_id
+    if (employerLink.source === 'profile') employerId = employerLink.id;
+    // Store GHL contact ID for the employer
+    if (employerLink.ghl_contact_id) ghlCompanyId = employerLink.ghl_contact_id;
+  }
+
   const jobData: Record<string, any> = {
     title: body.title || '',
     description: body.description || null,
@@ -61,12 +73,16 @@ export async function POST(req: NextRequest) {
     special_offer: body.special_offer || null,
     approval_status: 'approved',
     created_by: user.id,
+    employer_id: employerId || user.id,
   };
+
+  // Store GHL company contact ID if linked to existing employer
+  if (ghlCompanyId) jobData.ghl_company_id = ghlCompanyId;
 
   const { data: job, error } = await supabase.from('lf_jobs').insert(jobData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync to GHL using DB config
+  // Sync job to GHL Job Openings (just the job record, no employer association)
   let ghlSynced = false;
   if (job) {
     const fields = await getFieldsConfig();
@@ -80,5 +96,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ job, ghlSynced });
+  return NextResponse.json({ job, ghlSynced, employerLinked: !!employerLink });
 }
