@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug, Monitor } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug, Monitor, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// ITEM 28: Added Portal Preview to sidebar
 interface NavItem { label: string; href: string; icon: any; badge?: number; }
 interface NavGroup { title: string; items: NavItem[]; }
 
@@ -62,6 +61,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       items: [
         { label: 'Feedback', href: '/portal/suggestions', icon: MessageSquare },
         { label: 'Portal Preview', href: '/portal/preview', icon: Monitor },
+      ],
+    },
+    {
+      title: 'System',
+      items: [
+        { label: 'Sync Status', href: '/portal/sync-status', icon: RefreshCw },
+        { label: 'Audit Log', href: '/portal/audit', icon: ScrollText },
+        { label: 'Users & Access', href: '/portal/users', icon: Users },
       ],
     },
   ];
