@@ -1,6 +1,5 @@
-// GoHighLevel Configuration
-// Normalized to GHL_* convention. KLEEGR_* is deprecated.
-// All settings loaded from environment variables — never hardcode secrets.
+// GoHighLevel / Kleegr Configuration
+// All settings loaded from environment variables - never hardcode secrets.
 
 export const ghlConfig = {
   token: process.env.GHL_PRIVATE_INTEGRATION_TOKEN || process.env.KLEEGR_API_KEY || '',
@@ -22,12 +21,10 @@ export const ghlConfig = {
   },
 };
 
-// Backward compat alias
 export const kleegrConfig = ghlConfig;
 
 export function isGhlConfigured(): boolean {
   return !!(ghlConfig.token && ghlConfig.locationId);
 }
 
-// Backward compat alias
 export const isKleegrConfigured = isGhlConfigured;
