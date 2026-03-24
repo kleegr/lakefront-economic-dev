@@ -254,6 +254,23 @@ async function associateContactToJob(jobGhlRecordId: string, contactGhlId: strin
     return { ok: false, error: 'No association between contact and job_openings found. Create one in Kleegr: Settings > Objects > Job Openings > Associations > Create Association with Contacts.' };
   }
 
+  // Step 1: Remove old contact relations for this job (so changing employer replaces the old one)
+  try {
+    const relRes = await fetch(`${BASE}/associations/relations/record/${jobGhlRecordId}?locationId=${ghlConfig.locationId}`, { headers: h() });
+    if (relRes.ok) {
+      const relData = await relRes.json();
+      const relations = relData?.relations || relData?.data || [];
+      for (const rel of relations) {
+        if (rel.associationId === assocId && rel.id) {
+          const otherRecordId = rel.firstRecordId === jobGhlRecordId ? rel.secondRecordId : rel.firstRecordId;
+          if (otherRecordId === contactGhlId) continue;
+          await fetch(`${BASE}/associations/relations/${rel.id}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: h() });
+        }
+      }
+    }
+  } catch (e) { /* silently continue if cleanup fails */ }
+
+  // Step 2: Create the new relation
   const body = {
     locationId: ghlConfig.locationId,
     associationId: assocId,
@@ -267,7 +284,6 @@ async function associateContactToJob(jobGhlRecordId: string, contactGhlId: strin
     });
     const responseText = await res.text().catch(() => '');
     if (res.ok) return { ok: true };
-    // "duplicate relation" means it already exists - treat as success
     if (responseText.includes('duplicate relation')) return { ok: true };
     return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 300)} | assocId: ${assocId}` };
   } catch (e: any) {
