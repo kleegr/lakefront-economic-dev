@@ -65,7 +65,6 @@ export async function syncJobWithEmployer(job: Record<string, any>, _employer: a
         });
       }
     } else {
-      // No employer linked - remove all existing contact associations for this job
       await removeAllJobContactAssociations(result.ghlRecordId);
     }
   }
@@ -110,7 +109,16 @@ export async function syncEmployeeToJob(
       }
     } catch (e) { console.error('Opportunity sync failed:', e); }
   }
-  if (contactId && job?.ghl_record_id) await associateContactToJob(job.ghl_record_id, contactId);
+  // Associate employee contact to job opening (multiple employees can be linked to same job)
+  if (contactId && job?.ghl_record_id) {
+    const empAssoc = await associateEmployeeToJob(job.ghl_record_id, contactId);
+    if (empAssoc.ok) {
+      await logSyncSuccess('application', 'employee_job_associated', {
+        entity_id: app.id, ghl_id: contactId,
+        details: { name: app.applicant_name, job: job?.title, jobRecordId: job.ghl_record_id },
+      });
+    }
+  }
   if (contactId) {
     await logSyncSuccess('application', app.ghl_contact_id ? 'employee_updated' : 'employee_created', {
       entity_id: app.id, ghl_id: contactId,
@@ -245,6 +253,7 @@ async function getContactJobAssociationId(): Promise<string | null> {
   } catch (e) { console.error('Failed to get associations:', e); return null; }
 }
 
+// Associate EMPLOYER contact to job - removes old employer first (only 1 employer per job)
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<{ ok: boolean; error?: string }> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return { ok: false, error: 'Missing config or IDs' };
 
@@ -254,20 +263,33 @@ async function associateContactToJob(jobGhlRecordId: string, contactGhlId: strin
   }
 
   // Step 1: Remove old contact relations for this job (so changing employer replaces the old one)
+  let cleanupLog = '';
   try {
     const relRes = await fetch(`${BASE}/associations/relations/record/${jobGhlRecordId}?locationId=${ghlConfig.locationId}`, { headers: h() });
     if (relRes.ok) {
       const relData = await relRes.json();
       const relations = relData?.relations || relData?.data || [];
+      cleanupLog = `Found ${relations.length} relations for job ${jobGhlRecordId}. `;
       for (const rel of relations) {
         if (rel.associationId === assocId && rel.id) {
           const otherRecordId = rel.firstRecordId === jobGhlRecordId ? rel.secondRecordId : rel.firstRecordId;
-          if (otherRecordId === contactGhlId) continue;
-          await fetch(`${BASE}/associations/relations/${rel.id}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: h() });
+          if (otherRecordId === contactGhlId) { cleanupLog += `Keeping rel ${rel.id} (same contact). `; continue; }
+          cleanupLog += `Deleting rel ${rel.id} (old contact ${otherRecordId}). `;
+          const delRes = await fetch(`${BASE}/associations/relations/${rel.id}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: h() });
+          cleanupLog += `Delete status: ${delRes.status}. `;
         }
       }
+    } else {
+      cleanupLog = `GET relations returned ${relRes.status}`;
     }
-  } catch (e) { /* silently continue if cleanup fails */ }
+  } catch (e: any) { cleanupLog = `Cleanup error: ${e?.message}`; }
+
+  if (cleanupLog) {
+    await logSyncSuccess('job', 'association_cleanup', {
+      entity_id: jobGhlRecordId,
+      details: { cleanup: cleanupLog, newContactId: contactGhlId, assocId },
+    });
+  }
 
   // Step 2: Create the new relation
   const body = {
@@ -285,6 +307,33 @@ async function associateContactToJob(jobGhlRecordId: string, contactGhlId: strin
     if (res.ok) return { ok: true };
     if (responseText.includes('duplicate relation')) return { ok: true };
     return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 300)} | assocId: ${assocId}` };
+  } catch (e: any) {
+    return { ok: false, error: `Exception: ${e?.message || String(e)}` };
+  }
+}
+
+// Associate EMPLOYEE contact to job - does NOT remove others (multiple employees per job)
+async function associateEmployeeToJob(jobGhlRecordId: string, contactGhlId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return { ok: false, error: 'Missing config or IDs' };
+
+  const assocId = await getContactJobAssociationId();
+  if (!assocId) return { ok: false, error: 'No association defined' };
+
+  const body = {
+    locationId: ghlConfig.locationId,
+    associationId: assocId,
+    firstRecordId: contactGhlId,
+    secondRecordId: jobGhlRecordId,
+  };
+
+  try {
+    const res = await fetch(`${BASE}/associations/relations`, {
+      method: 'POST', headers: h(), body: JSON.stringify(body),
+    });
+    const responseText = await res.text().catch(() => '');
+    if (res.ok) return { ok: true };
+    if (responseText.includes('duplicate relation')) return { ok: true };
+    return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 200)}` };
   } catch (e: any) {
     return { ok: false, error: `Exception: ${e?.message || String(e)}` };
   }
