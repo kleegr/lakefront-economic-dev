@@ -64,6 +64,9 @@ export async function syncJobWithEmployer(job: Record<string, any>, _employer: a
           details: { title: job.title, contactId: employerGhlContactId, company: job.company_name },
         });
       }
+    } else {
+      // No employer linked - remove all existing contact associations for this job
+      await removeAllJobContactAssociations(result.ghlRecordId);
     }
   }
   return result;
@@ -82,14 +85,12 @@ export async function syncEmployeeToJob(
   const tags = ['lakefront-employee', 'lakefront-applicant'];
   if (job?.title) tags.push(`job:${job.title.substring(0, 40)}`);
   if (['hired', 'offered'].includes(app.status)) tags.push('lakefront-hired');
-
   let contactId = app.ghl_contact_id || null;
   try {
     const cd: Record<string, any> = { locationId: ghlConfig.locationId, firstName: nameParts[0] || '', lastName: nameParts.slice(1).join(' ') || '', email: app.applicant_email || '', phone: app.applicant_phone || '', address1: app.address || '', source: 'Lakefront Portal', tags, customFields };
     if (contactId) { await fetch(`${BASE}/contacts/${contactId}`, { method: 'PUT', headers: h(), body: JSON.stringify(cd) }); }
     else { const ex = await findContactByEmail(app.applicant_email); if (ex) { contactId = ex; await fetch(`${BASE}/contacts/${contactId}`, { method: 'PUT', headers: h(), body: JSON.stringify(cd) }); } else { const r = await fetch(`${BASE}/contacts/`, { method: 'POST', headers: h(), body: JSON.stringify(cd) }); const d = await r.json(); contactId = d?.contact?.id || null; } }
   } catch (e) { console.error('Contact sync failed:', e); }
-
   let opportunityId = app.ghl_opportunity_id || null;
   if (contactId && ghlConfig.pipelines.ats) {
     try {
@@ -109,9 +110,7 @@ export async function syncEmployeeToJob(
       }
     } catch (e) { console.error('Opportunity sync failed:', e); }
   }
-
   if (contactId && job?.ghl_record_id) await associateContactToJob(job.ghl_record_id, contactId);
-
   if (contactId) {
     await logSyncSuccess('application', app.ghl_contact_id ? 'employee_updated' : 'employee_created', {
       entity_id: app.id, ghl_id: contactId,
@@ -294,4 +293,21 @@ async function associateContactToJob(jobGhlRecordId: string, contactGhlId: strin
 async function findContactByEmail(email: string): Promise<string | null> {
   if (!email || !isGhlConfigured()) return null;
   try { const r = await fetch(`${BASE}/contacts/search/duplicate`, { method: 'POST', headers: h(), body: JSON.stringify({ locationId: ghlConfig.locationId, email }) }); const d = await r.json(); return d?.contact?.id || null; } catch { return null; }
+}
+
+async function removeAllJobContactAssociations(jobGhlRecordId: string): Promise<void> {
+  if (!isGhlConfigured() || !jobGhlRecordId) return;
+  const assocId = await getContactJobAssociationId();
+  if (!assocId) return;
+  try {
+    const relRes = await fetch(`${BASE}/associations/relations/record/${jobGhlRecordId}?locationId=${ghlConfig.locationId}`, { headers: h() });
+    if (!relRes.ok) return;
+    const relData = await relRes.json();
+    const relations = relData?.relations || relData?.data || [];
+    for (const rel of relations) {
+      if (rel.associationId === assocId && rel.id) {
+        await fetch(`${BASE}/associations/relations/${rel.id}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: h() });
+      }
+    }
+  } catch (e) { /* silently continue */ }
 }
