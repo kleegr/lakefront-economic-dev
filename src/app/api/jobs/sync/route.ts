@@ -14,17 +14,38 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const direction = body.direction || 'push';
   const fields = await getFieldsConfig();
-  const results = { pushed: 0, pulled: 0, errors: [] as string[] };
+  const results = { pushed: 0, pulled: 0, deleted: 0, errors: [] as string[] };
 
   if (direction === 'push' || direction === 'both') {
     const { data: jobs } = await supabase.from('lf_jobs').select('*');
     for (const job of (jobs || [])) {
-      const eid = job.employer_id || job.created_by;
-      let employer = null;
-      if (eid) { const { data: emp } = await supabase.from('lf_profiles').select('id, full_name, email, phone, kleegr_contact_id, company_name').eq('id', eid).single(); employer = emp; }
-      const sync = await syncJobWithEmployer(job, employer);
-      if (sync.success) { results.pushed++; if (sync.ghlRecordId) await supabase.from('lf_jobs').update({ ghl_record_id: sync.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', job.id); }
-      else results.errors.push(`Push failed for "${job.title}": ${sync.error}`);
+      const sync = await syncJobWithEmployer(job, null);
+      if (sync.success) {
+        results.pushed++;
+        if (sync.ghlRecordId) {
+          await supabase.from('lf_jobs').update({
+            ghl_record_id: sync.ghlRecordId,
+            ghl_synced_at: new Date().toISOString(),
+          }).eq('id', job.id);
+        }
+      } else {
+        results.errors.push(`Push failed for "${job.title}": ${sync.error}`);
+      }
+    }
+
+    // After pushing, check for portal jobs with ghl_record_id that no longer exist in GHL
+    // Fetch all GHL job records to know what exists
+    const ghlRecords = await fetchAllGhlJobs();
+    const ghlIds = new Set(ghlRecords.map(r => r.id));
+
+    // Find portal jobs that have a ghl_record_id not in GHL anymore
+    const { data: syncedJobs } = await supabase.from('lf_jobs').select('id, title, ghl_record_id').not('ghl_record_id', 'is', null);
+    for (const sj of (syncedJobs || [])) {
+      if (sj.ghl_record_id && !ghlIds.has(sj.ghl_record_id)) {
+        // This job was deleted in GHL - delete from portal too
+        await supabase.from('lf_jobs').delete().eq('id', sj.id);
+        results.deleted++;
+      }
     }
   }
 
@@ -33,8 +54,10 @@ export async function POST(req: NextRequest) {
     for (const record of ghlRecords) {
       const jobData = ghlPropertiesToJob(record.properties, fields);
       if (!jobData.title) continue;
-      if (jobData.id) {
-        const { error } = await supabase.from('lf_jobs').update({ ...jobData, ghl_record_id: record.id, ghl_synced_at: new Date().toISOString() }).eq('id', jobData.id);
+      // Check if we already have this GHL record in portal
+      const { data: existing } = await supabase.from('lf_jobs').select('id').eq('ghl_record_id', record.id).maybeSingle();
+      if (existing) {
+        const { error } = await supabase.from('lf_jobs').update({ ...jobData, ghl_record_id: record.id, ghl_synced_at: new Date().toISOString() }).eq('id', existing.id);
         if (!error) results.pulled++; else results.errors.push(`Pull update: ${error.message}`);
       } else {
         const slug = String(jobData.title).toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -43,5 +66,6 @@ export async function POST(req: NextRequest) {
       }
     }
   }
+
   return NextResponse.json({ success: true, ...results });
 }
