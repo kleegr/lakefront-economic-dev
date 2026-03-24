@@ -1,10 +1,10 @@
 // JOB OPENINGS = ONLY for job posts. Employee contacts get associated to jobs.
-// Employer contacts are just GHL contacts - NOT associated to Job Openings.
+// Employer contacts get associated to Job Openings when linked.
 //
 // ATS Pipeline Sync:
-//   - Portal status changes -> move opportunity to correct GHL pipeline STAGE
-//   - GHL stage changes -> update portal application status
-//   - Stage names are fetched from GHL API and cached
+//   - Portal status changes -> move opportunity to correct Kleegr pipeline STAGE
+//   - Kleegr stage changes -> update portal application status
+//   - Stage names are fetched from Kleegr API and cached
 
 import { ghlConfig, isGhlConfigured } from './config';
 import { syncJobToGhl } from './job-sync';
@@ -25,13 +25,13 @@ async function cfMap(): Promise<Record<string, string>> {
 }
 function cf(map: Record<string, string>, key: string, val: string) { const id = map[key]; return (id && val) ? { id, field_value: val } : null; }
 
-// 1. SYNC JOB -> GHL Job Opening (ONLY the job record, no contact associations)
+// 1. SYNC JOB -> Kleegr Job Opening (just the job record)
 export async function syncJobToGhlRecord(
   job: Record<string, any>,
 ): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) {
-    await logSyncError('job', 'job_sync', 'GHL not configured', { entity_id: job.id, details: { title: job.title } });
-    return { ghlRecordId: null, success: false, error: 'GHL not configured' };
+    await logSyncError('job', 'job_sync', 'Kleegr not configured', { entity_id: job.id, details: { title: job.title } });
+    return { ghlRecordId: null, success: false, error: 'Kleegr not configured' };
   }
   const fields = await getFieldsConfig();
   const jobSync = await syncJobToGhl(job, fields, job.ghl_record_id || null);
@@ -47,11 +47,25 @@ export async function syncJobToGhlRecord(
   return { ghlRecordId, success: true };
 }
 
+// SYNC JOB + ASSOCIATE EMPLOYER CONTACT to the Job Opening
 export async function syncJobWithEmployer(job: Record<string, any>, _employer: any) {
-  return syncJobToGhlRecord(job);
+  const result = await syncJobToGhlRecord(job);
+
+  // After job is synced, associate the employer contact to the Job Opening
+  if (result.success && result.ghlRecordId) {
+    const employerGhlContactId = job.ghl_company_id;
+    if (employerGhlContactId) {
+      const associated = await associateContactToJob(result.ghlRecordId, employerGhlContactId);
+      if (associated) {
+        console.log(`Associated employer contact ${employerGhlContactId} to job ${result.ghlRecordId}`);
+      }
+    }
+  }
+
+  return result;
 }
 
-// 2. SYNC EMPLOYEE -> GHL (contact + opportunity with pipeline stage + associate to Job Opening)
+// 2. SYNC EMPLOYEE -> Kleegr (contact + opportunity with pipeline stage + associate to Job Opening)
 export async function syncEmployeeToJob(
   app: Record<string, any>, job: Record<string, any> | null,
 ): Promise<{ contactId: string | null; opportunityId: string | null; success: boolean }> {
@@ -66,7 +80,6 @@ export async function syncEmployeeToJob(
   if (job?.title) tags.push(`job:${job.title.substring(0, 40)}`);
   if (['hired', 'offered'].includes(app.status)) tags.push('lakefront-hired');
 
-  // Upsert contact
   let contactId = app.ghl_contact_id || null;
   try {
     const cd: Record<string, any> = { locationId: ghlConfig.locationId, firstName: nameParts[0] || '', lastName: nameParts.slice(1).join(' ') || '', email: app.applicant_email || '', phone: app.applicant_phone || '', address1: app.address || '', source: 'Lakefront Portal', tags, customFields };
@@ -74,21 +87,17 @@ export async function syncEmployeeToJob(
     else { const ex = await findContactByEmail(app.applicant_email); if (ex) { contactId = ex; await fetch(`${BASE}/contacts/${contactId}`, { method: 'PUT', headers: h(), body: JSON.stringify(cd) }); } else { const r = await fetch(`${BASE}/contacts/`, { method: 'POST', headers: h(), body: JSON.stringify(cd) }); const d = await r.json(); contactId = d?.contact?.id || null; } }
   } catch (e) { console.error('Contact sync failed:', e); }
 
-  // Create/update opportunity with correct pipeline STAGE
   let opportunityId = app.ghl_opportunity_id || null;
   if (contactId && ghlConfig.pipelines.ats) {
     try {
       const oppName = `${app.applicant_name || 'Applicant'} -> ${job?.title || 'Job'}`;
       const oppStatus = APP_STATUS_TO_OPP_STATUS[app.status] || 'open';
       const stageId = await getStageIdForStatus(app.status);
-
       if (opportunityId) {
-        // Update existing opportunity - move to correct stage
         const updateData: Record<string, any> = { status: oppStatus, name: oppName };
         if (stageId) updateData.pipelineStageId = stageId;
         await fetch(`${BASE}/opportunities/${opportunityId}`, { method: 'PUT', headers: h(), body: JSON.stringify(updateData) });
       } else {
-        // Create new opportunity at the correct stage
         const createData: Record<string, any> = { locationId: ghlConfig.locationId, pipelineId: ghlConfig.pipelines.ats, name: oppName, contactId, status: oppStatus };
         if (stageId) createData.pipelineStageId = stageId;
         const r = await fetch(`${BASE}/opportunities/`, { method: 'POST', headers: h(), body: JSON.stringify(createData) });
@@ -114,7 +123,7 @@ export async function syncEmployeeToJob(
   return { contactId, opportunityId, success: !!contactId };
 }
 
-// 3. SYNC EMPLOYER -> GHL contact ONLY (NO Job Opening association)
+// 3. SYNC EMPLOYER -> Kleegr contact ONLY (NO Job Opening association)
 export async function syncEmployerContact(
   employer: Record<string, any>, app: Record<string, any>,
 ): Promise<{ contactId: string | null; success: boolean }> {
@@ -145,31 +154,25 @@ export async function syncEmployerToJob(employer: Record<string, any>, _job: any
   return syncEmployerContact(employer, employer);
 }
 
-// 4. GHL -> PORTAL: Process inbound webhook
+// 4. Kleegr -> PORTAL: Process inbound webhook
 export async function processGhlWebhook(body: any, supabase: any): Promise<{ action: string; details?: any }> {
   const eventType = body.type || body.event || '';
 
-  // A. Opportunity status OR stage changed - use pipeline stage mapping
   if (eventType === 'OpportunityStatusUpdate' || eventType === 'OpportunityStageUpdate') {
     const contactId = body.contactId || body.contact_id || body.data?.contactId;
     const oppId = body.opportunityId || body.id || body.data?.id;
     if (!contactId) return { action: 'ignored' };
     const { data: app } = await supabase.from('lf_applications').select('id, status, job_id').eq('ghl_contact_id', contactId).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (!app) return { action: 'no_matching_app' };
-
-    // Resolve the new status from stage name, stage ID, or opp status
     const newStatus = await resolveStatusFromWebhook(body);
     if (!newStatus) return { action: 'status_unmapped', details: { body } };
-
     if (newStatus !== app.status) {
       const updateData: Record<string, any> = { status: newStatus, updated_at: new Date().toISOString() };
       if (oppId) updateData.ghl_opportunity_id = oppId;
-      // Track the stage ID if available
       const stageId = body.stageId || body.stage_id || body.data?.stageId || body.data?.stage_id || body.pipelineStageId || body.data?.pipelineStageId;
       if (stageId) updateData.ghl_stage_id = stageId;
       const pipelineId = body.pipelineId || body.data?.pipelineId;
       if (pipelineId) updateData.ghl_pipeline_id = pipelineId;
-
       await supabase.from('lf_applications').update(updateData).eq('id', app.id);
       await logSyncInbound('pipeline_stage_synced', { entity_id: app.id, ghl_id: contactId, details: { from: app.status, to: newStatus, stageId, oppId } });
       return { action: 'stage_synced', details: { from: app.status, to: newStatus } };
@@ -177,7 +180,6 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
     return { action: 'status_unchanged' };
   }
 
-  // B. Contact updated in GHL -> sync fields back
   if (eventType === 'ContactUpdate') {
     const contactId = body.contactId || body.contact_id || body.id || body.data?.contactId || body.data?.id;
     const customFieldValues = body.customFields || body.customField || body.data?.customFields || body.data?.customField || [];
@@ -196,7 +198,6 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
     return { action: 'no_field_changes' };
   }
 
-  // C. Employee associated to Job Opening
   if (eventType === 'CustomObjectAssociation') {
     const recordId = body.recordId || body.data?.recordId;
     const contactId = body.contactId || body.data?.contactId;
@@ -214,7 +215,6 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
     return { action: 'not_employee_contact' };
   }
 
-  // D. Employee disassociated from Job Opening
   if (eventType === 'CustomObjectDisassociation') {
     const recordId = body.recordId || body.data?.recordId;
     const contactId = body.contactId || body.data?.contactId;
@@ -236,7 +236,14 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<boolean> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return false;
   const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
-  try { await fetch(`${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`, { method: 'POST', headers: h(), body: JSON.stringify({ locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] }) }); return true; } catch { return false; }
+  try {
+    const res = await fetch(`${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`, {
+      method: 'POST', headers: h(),
+      body: JSON.stringify({ locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] })
+    });
+    if (!res.ok) { console.error('Association failed:', res.status, await res.text().catch(() => '')); return false; }
+    return true;
+  } catch (e) { console.error('Association error:', e); return false; }
 }
 
 async function findContactByEmail(email: string): Promise<string | null> {
