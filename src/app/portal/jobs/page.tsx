@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Eye, EyeOff, X, Briefcase, Building2, MapPin, DollarSign, ChevronDown, Search, RefreshCw, Check, User } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, X, Briefcase, Building2, MapPin, DollarSign, ChevronDown, Search, RefreshCw, Check, User, Zap } from 'lucide-react';
 
 function fmt(s: string) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
@@ -16,8 +16,8 @@ export default function AdminJobsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [syncActive, setSyncActive] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, any>>({});
@@ -28,11 +28,42 @@ export default function AdminJobsPage() {
   const [searchingEmp, setSearchingEmp] = useState(false);
   const empRef = useRef<HTMLDivElement>(null);
   const searchT = useRef<any>(null);
+  const lastSyncRef = useRef('');
 
-  useEffect(() => { loadAll(); }, []);
+  const loadAll = useCallback(async () => {
+    const [j, f] = await Promise.all([fetch('/api/jobs?admin=true').then(r => r.json()), fetch('/api/jobs/fields-config').then(r => r.json())]);
+    setJobs(j.jobs || []); setFields(f.fields || []); setLoading(false);
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { const h = (e: MouseEvent) => { if (empRef.current && !empRef.current.contains(e.target as Node)) setShowEmpDD(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
-  async function loadAll() { const [j, f] = await Promise.all([fetch('/api/jobs?admin=true').then(r => r.json()), fetch('/api/jobs/fields-config').then(r => r.json())]); setJobs(j.jobs || []); setFields(f.fields || []); setLoading(false); }
+  // LIVE AUTO-SYNC: runs every 5 seconds, syncs changed jobs to Kleegr and checks for deletions
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        setSyncActive(true);
+        const res = await fetch('/api/jobs/auto-sync');
+        if (res.ok) {
+          const data = await res.json();
+          // If anything was pushed or deleted, refresh the jobs list
+          if (data.pushed > 0 || data.deleted > 0) {
+            const parts: string[] = [];
+            if (data.pushed) parts.push(`Synced ${data.pushed} jobs`);
+            if (data.deleted) parts.push(`Removed ${data.deleted} from Kleegr`);
+            setSyncMsg(parts.join('. '));
+            loadAll();
+            // Clear message after 5 seconds
+            setTimeout(() => setSyncMsg(''), 5000);
+          }
+          lastSyncRef.current = data.timestamp || '';
+        }
+      } catch (e) { /* silent fail for background sync */ }
+      setSyncActive(false);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadAll]);
+
   async function searchEmp(q: string) { setSearchingEmp(true); try { const r = await fetch(`/api/employers/search?q=${encodeURIComponent(q)}`); const d = await r.json(); setEmployerResults(d.employers || []); } catch { setEmployerResults([]); } setSearchingEmp(false); }
   function handleEmpInput(val: string) { setEmployerQuery(val); setForm({ ...form, company_name: val }); setSelectedEmp(null); if (searchT.current) clearTimeout(searchT.current); searchT.current = setTimeout(() => searchEmp(val), 300); setShowEmpDD(true); }
   function selectEmp(emp: Employer) { setSelectedEmp(emp); setEmployerQuery(emp.company_name); setShowEmpDD(false); setForm(p => ({ ...p, company_name: emp.company_name })); }
@@ -44,7 +75,6 @@ export default function AdminJobsPage() {
   async function saveJob(e: React.FormEvent) { e.preventDefault(); setSaving(true); const url = editingJob ? `/api/jobs/${editingJob.id}` : '/api/jobs'; const method = editingJob ? 'PUT' : 'POST'; const payload: Record<string, any> = { ...form }; if (selectedEmp) payload.employer_link = { id: selectedEmp.id, source: selectedEmp.source, ghl_contact_id: selectedEmp.ghl_contact_id, contact_name: selectedEmp.contact_name, email: selectedEmp.email, phone: selectedEmp.phone }; const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (res.ok) { setShowForm(false); loadAll(); } else { const d = await res.json(); alert(d.error || 'Failed'); } setSaving(false); }
   async function deleteJob(id: string) { if (!confirm('Delete this job permanently?')) return; await fetch(`/api/jobs/${id}`, { method: 'DELETE' }); loadAll(); }
   async function toggleStatus(id: string, current: string) { await fetch(`/api/jobs/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: current === 'published' ? 'draft' : 'published' }) }); loadAll(); }
-  async function syncToKleegr() { setSyncing(true); setSyncMsg(''); const res = await fetch('/api/jobs/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction: 'push' }) }); const data = await res.json(); const parts: string[] = []; if (data.pushed) parts.push(`Pushed ${data.pushed} jobs`); if (data.skipped) parts.push(`${data.skipped} already up-to-date`); if (data.deleted) parts.push(`Removed ${data.deleted} deleted from GHL`); if (!data.pushed && !data.deleted && data.skipped) parts.push('All jobs are in sync'); if (data.errors?.length) parts.push(data.errors.join('; ')); setSyncMsg(parts.join('. ') || 'Sync complete.'); setSyncing(false); loadAll(); }
 
   const filtered = jobs.filter(j => !search || (j.title || '').toLowerCase().includes(search.toLowerCase()) || (j.company_name || '').toLowerCase().includes(search.toLowerCase()));
   const fieldGroups: Record<string, FieldConfig[]> = {};
@@ -56,13 +86,18 @@ export default function AdminJobsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="font-display text-2xl font-bold text-brand-forest">Jobs Management</h1><p className="text-sm font-body text-gray-400 mt-1">{jobs.length} total - {jobs.filter(j => j.status === 'published').length} published</p></div>
-        <div className="flex gap-2">
-          <button onClick={syncToKleegr} disabled={syncing} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg text-xs font-body font-semibold hover:bg-gray-50 disabled:opacity-50"><RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} /> Sync to Kleegr</button>
+        <div>
+          <h1 className="font-display text-2xl font-bold text-brand-forest">Jobs Management</h1>
+          <p className="text-sm font-body text-gray-400 mt-1">{jobs.length} total - {jobs.filter(j => j.status === 'published').length} published</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-[10px] font-body font-semibold">
+            <Zap className={`w-3 h-3 ${syncActive ? 'animate-pulse' : ''}`} /> Live Sync ON
+          </span>
           <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> New Job</button>
         </div>
       </div>
-      {syncMsg && <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-body">{syncMsg}</div>}
+      {syncMsg && <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-body flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" />{syncMsg}</div>}
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div>
       <div className="space-y-3">
         {filtered.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl border border-gray-100"><Briefcase className="w-10 h-10 text-gray-200 mx-auto mb-3" /><p className="text-gray-400 font-body">No jobs found</p></div>
@@ -95,9 +130,9 @@ export default function AdminJobsPage() {
                 <div ref={empRef} className="relative">
                   <div className="relative"><Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input type="text" value={employerQuery} onChange={e => handleEmpInput(e.target.value)} onFocus={() => { searchEmp(employerQuery); setShowEmpDD(true); }} className="input-portal pl-10" placeholder="Search existing contacts or type new..." required={field.required} />{selectedEmp && <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />}</div>
                   {showEmpDD && (<div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-                    {searchingEmp && <div className="p-3 text-xs text-gray-400 font-body text-center">Searching portal + GHL...</div>}
+                    {searchingEmp && <div className="p-3 text-xs text-gray-400 font-body text-center">Searching portal + Kleegr...</div>}
                     {!searchingEmp && employerResults.length === 0 && <div className="p-3 text-xs text-gray-400 font-body text-center">No contacts found. Type a new company name.</div>}
-                    {employerResults.map(emp => (<button key={emp.id + emp.source} type="button" onClick={() => selectEmp(emp)} className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"><div className="flex items-center justify-between"><div><p className="text-sm font-body font-semibold text-brand-forest">{emp.company_name}</p><p className="text-[10px] font-body text-gray-400">{emp.contact_name}{emp.email ? ` - ${emp.email}` : ''}</p></div><div className="flex items-center gap-1">{emp.ghl_contact_id && <span className="px-1.5 py-0.5 text-[8px] rounded bg-green-50 text-green-600 font-semibold">GHL</span>}<span className={`px-1.5 py-0.5 text-[8px] rounded font-semibold ${emp.source === 'ghl' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>{emp.source === 'ghl' ? 'Kleegr' : 'Portal'}</span></div></div></button>))}
+                    {employerResults.map(emp => (<button key={emp.id + emp.source} type="button" onClick={() => selectEmp(emp)} className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"><div className="flex items-center justify-between"><div><p className="text-sm font-body font-semibold text-brand-forest">{emp.company_name}</p><p className="text-[10px] font-body text-gray-400">{emp.contact_name}{emp.email ? ` - ${emp.email}` : ''}</p></div><div className="flex items-center gap-1">{emp.ghl_contact_id && <span className="px-1.5 py-0.5 text-[8px] rounded bg-green-50 text-green-600 font-semibold">Kleegr</span>}<span className={`px-1.5 py-0.5 text-[8px] rounded font-semibold ${emp.source === 'ghl' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>{emp.source === 'ghl' ? 'Kleegr' : 'Portal'}</span></div></div></button>))}
                   </div>)}
                   {selectedEmp && (<div className="mt-2 p-3 bg-green-50/50 rounded-lg border border-green-100"><div className="flex items-center gap-2 mb-1"><User className="w-3.5 h-3.5 text-green-600" /><span className="text-xs font-body font-semibold text-green-700">Linked to: {selectedEmp.company_name}</span></div><div className="text-[10px] font-body text-green-600 space-y-0.5">{selectedEmp.contact_name && <p>Contact: {selectedEmp.contact_name}</p>}{selectedEmp.email && <p>Email: {selectedEmp.email}</p>}{selectedEmp.phone && <p>Phone: {selectedEmp.phone}</p>}<p>Source: {selectedEmp.source === 'ghl' ? 'Kleegr Contact' : 'Portal'}{selectedEmp.ghl_contact_id ? ` (ID: ${selectedEmp.ghl_contact_id.substring(0, 10)}...)` : ''}</p></div><button type="button" onClick={() => { setSelectedEmp(null); }} className="mt-1 text-[10px] text-red-500 font-body underline">Unlink</button></div>)}
                 </div>
