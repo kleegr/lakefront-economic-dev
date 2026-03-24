@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown, Upload, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getAllFields, GROUP_LABELS } from '@/lib/ghl/employee-fields';
+import { getAllFields, GROUP_LABELS, type EmployeeFieldConfig } from '@/lib/ghl/employee-fields';
+import { EMPLOYER_FIELDS, EMPLOYER_GROUP_LABELS, type EmployerFieldConfig } from '@/lib/ghl/employer-fields';
 
 const STATUSES = ['submitted','reviewing','interview','offered','hired','rejected','withdrawn'];
 const APP_TYPES = ['employee','employer','provider','space_rental'];
@@ -10,9 +11,18 @@ const STATUS_COLORS: Record<string,string> = {submitted:'bg-blue-50 text-blue-70
 const TYPE_COLORS: Record<string,string> = {employee:'bg-blue-50 text-blue-600',employer:'bg-green-50 text-green-600',provider:'bg-purple-50 text-purple-600',space_rental:'bg-amber-50 text-amber-600'};
 function fmt(s: string) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
-const allFields = getAllFields();
-const fieldsByGroup: Record<string, typeof allFields> = {};
-for (const f of allFields) { if (!fieldsByGroup[f.group]) fieldsByGroup[f.group] = []; fieldsByGroup[f.group].push(f); }
+type AnyField = EmployeeFieldConfig | EmployerFieldConfig;
+const employeeFields = getAllFields();
+const employeeGroups: Record<string, AnyField[]> = {};
+for (const f of employeeFields) { if (!employeeGroups[f.group]) employeeGroups[f.group] = []; employeeGroups[f.group].push(f); }
+const employerGroups: Record<string, AnyField[]> = {};
+for (const f of EMPLOYER_FIELDS) { if (!employerGroups[f.group]) employerGroups[f.group] = []; employerGroups[f.group].push(f); }
+const ALL_GROUP_LABELS: Record<string, string> = { ...GROUP_LABELS, ...EMPLOYER_GROUP_LABELS };
+
+function getFieldsForType(type: string): { groups: Record<string, AnyField[]>; allFields: AnyField[] } {
+  if (type === 'employer') return { groups: employerGroups, allFields: EMPLOYER_FIELDS };
+  return { groups: employeeGroups, allFields: employeeFields };
+}
 
 export default function PortalApplicationsPage() {
   const [apps, setApps] = useState<any[]>([]);
@@ -26,7 +36,9 @@ export default function PortalApplicationsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newForm, setNewForm] = useState<Record<string, any>>({ applicant_name: '', applicant_email: '', applicant_phone: '', address: '', application_type: 'employee', cover_letter: '', status: 'submitted', notes: '' });
   const [saving, setSaving] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, experience: false, application: true, admin: true });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, experience: false, application: true, admin: true, business: true, employment: true });
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, []);
   async function load() { const res = await fetch('/api/applications?admin=true'); const data = await res.json(); setApps(data.applications || []); setLoading(false); }
@@ -41,6 +53,7 @@ export default function PortalApplicationsPage() {
 
   function startEdit() {
     if (!selected) return;
+    const { allFields } = getFieldsForType(selected.application_type);
     const form: Record<string, any> = { status: selected.status, notes: selected.notes || '', address: selected.address || '' };
     for (const f of allFields) form[f.key] = selected[f.key] ?? '';
     setEditForm(form); setEditing(true);
@@ -52,9 +65,26 @@ export default function PortalApplicationsPage() {
 
   const toggleGroup = (g: string) => setExpandedGroups(prev => ({ ...prev, [g]: !prev[g] }));
 
-  function renderField(field: typeof allFields[0], formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
+  async function handleFileUpload(file: File, formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
+    setUploading(true);
+    const fd = new FormData(); fd.append('file', file);
+    try { const res = await fetch('/api/upload', { method: 'POST', body: fd }); const data = await res.json(); if (data.url) setFormState({ ...formState, resume_url: data.url }); else alert(data.error || 'Upload failed'); } catch { alert('Upload failed'); }
+    setUploading(false);
+  }
+
+  function renderField(field: AnyField, formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
     const val = formState[field.key]; const set = (v: any) => setFormState({ ...formState, [field.key]: v });
     const cls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage';
+    if (field.type === 'file') {
+      return (<div>
+        {val && <a href={val} target="_blank" rel="noopener noreferrer" className="text-xs font-body text-blue-600 underline mb-1 block flex items-center gap-1"><FileText className="w-3 h-3" />View uploaded file</a>}
+        <label className={cn('flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-sage transition-colors', uploading && 'opacity-50 pointer-events-none')}>
+          <Upload className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-body text-gray-500">{uploading ? 'Uploading...' : val ? 'Replace file' : 'Upload resume (PDF, DOC)'}</span>
+          <input type="file" className="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, formState, setFormState); }} />
+        </label>
+      </div>);
+    }
     if (field.type === 'select') return <select value={val || ''} onChange={e => set(e.target.value)} className={cls}><option value="">Select...</option>{(field.options || []).map(o => <option key={o} value={o}>{o}</option>)}</select>;
     if (field.type === 'multiselect') return <div className="flex flex-wrap gap-1 border border-gray-200 rounded-lg p-2 max-h-24 overflow-y-auto">{(field.options || []).map(o => <button key={o} type="button" onClick={() => { const cur = val || []; set(cur.includes(o) ? cur.filter((x: string) => x !== o) : [...cur, o]); }} className={`px-2 py-0.5 rounded-full text-[10px] font-body transition-colors ${(val || []).includes?.(o) ? 'bg-brand-forest text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{o}</button>)}</div>;
     if (field.type === 'textarea') return <textarea rows={2} value={val || ''} onChange={e => set(e.target.value)} className={cn(cls, 'resize-none')} placeholder={field.placeholder} />;
@@ -63,16 +93,33 @@ export default function PortalApplicationsPage() {
     return <input type="text" value={val || ''} onChange={e => set(e.target.value)} className={cls} placeholder={field.placeholder} />;
   }
 
-  function renderFieldGroups(formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
-    return Object.entries(fieldsByGroup).map(([gk, fields]) => (
+  function renderFieldGroups(formState: Record<string, any>, setFormState: (v: Record<string, any>) => void, type: string) {
+    const { groups } = getFieldsForType(type);
+    return Object.entries(groups).map(([gk, fields]) => (
       <div key={gk} className="border-t pt-3">
         <button type="button" onClick={() => toggleGroup(gk)} className="flex items-center justify-between w-full mb-2">
-          <p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-400">{GROUP_LABELS[gk] || gk}</p>
+          <p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-400">{ALL_GROUP_LABELS[gk] || gk}</p>
           <ChevronDown className={`w-3.5 h-3.5 text-gray-300 transition-transform ${expandedGroups[gk] ? 'rotate-180' : ''}`} />
         </button>
         {expandedGroups[gk] && <div className="grid sm:grid-cols-2 gap-3">{fields.map(f => <div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">{f.label}</label>{renderField(f, formState, setFormState)}</div>)}</div>}
       </div>
     ));
+  }
+
+  function renderViewFields(app: any) {
+    const { groups } = getFieldsForType(app.application_type);
+    return Object.entries(groups).map(([gk, fields]) => {
+      const populated = fields.filter(f => { const v = app[f.key]; return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0); });
+      if (populated.length === 0) return null;
+      return (<div key={gk}><p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-300 mb-2">{ALL_GROUP_LABELS[gk] || gk}</p><div className="grid sm:grid-cols-2 gap-2">{populated.map(f => (<div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}>
+        <p className="text-[10px] font-body text-gray-400">{f.label}</p>
+        {f.type === 'file' && app[f.key] ? (
+          <a href={app[f.key]} target="_blank" rel="noopener noreferrer" className="text-sm font-body text-blue-600 underline flex items-center gap-1"><FileText className="w-3.5 h-3.5" />View Resume</a>
+        ) : (
+          <p className="text-sm font-body text-brand-forest">{Array.isArray(app[f.key]) ? app[f.key].join(', ') : String(app[f.key])}</p>
+        )}
+      </div>))}</div></div>);
+    });
   }
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
@@ -126,17 +173,13 @@ export default function PortalApplicationsPage() {
                   <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Status</label><select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body">{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div>
                   <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={editForm.address || ''} onChange={e => setEditForm({...editForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
                 </div>
-                {renderFieldGroups(editForm, setEditForm)}
+                {renderFieldGroups(editForm, setEditForm, selected.application_type)}
                 <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Admin Notes</label><textarea rows={2} value={editForm.notes || ''} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body resize-none" /></div>
                 <div className="flex gap-2"><button onClick={saveEdit} disabled={saving} className="px-4 py-2 bg-brand-forest text-white rounded-lg text-sm font-semibold disabled:opacity-50">{saving ? 'Saving & Syncing...' : 'Save & Sync to Kleegr'}</button><button onClick={() => setEditing(false)} className="px-4 py-2 border border-gray-200 text-gray-500 rounded-lg text-sm">Cancel</button></div>
               </div>
             ) : (
               <div className="space-y-3 pt-2 border-t">
-                {Object.entries(fieldsByGroup).map(([gk, fields]) => {
-                  const populated = fields.filter(f => { const v = selected[f.key]; return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0); });
-                  if (populated.length === 0) return null;
-                  return (<div key={gk}><p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-300 mb-2">{GROUP_LABELS[gk] || gk}</p><div className="grid sm:grid-cols-2 gap-2">{populated.map(f => (<div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}><p className="text-[10px] font-body text-gray-400">{f.label}</p><p className="text-sm font-body text-brand-forest">{Array.isArray(selected[f.key]) ? selected[f.key].join(', ') : String(selected[f.key])}</p></div>))}</div></div>);
-                })}
+                {renderViewFields(selected)}
                 {selected.notes && <div><p className="text-[10px] font-body text-gray-400">Admin Notes</p><p className="text-sm font-body text-gray-600 whitespace-pre-wrap">{selected.notes}</p></div>}
                 {selected.ghl_synced_at && <p className="text-[10px] font-body text-gray-300">Last synced: {new Date(selected.ghl_synced_at).toLocaleString()}</p>}
               </div>
@@ -154,7 +197,7 @@ export default function PortalApplicationsPage() {
           <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Phone</label><input value={newForm.applicant_phone || ''} onChange={e => setNewForm({...newForm, applicant_phone: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
           <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={newForm.address || ''} onChange={e => setNewForm({...newForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
         </div>
-        {renderFieldGroups(newForm, setNewForm)}
+        {renderFieldGroups(newForm, setNewForm, newForm.application_type)}
         <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Admin Notes</label><textarea rows={2} value={newForm.notes || ''} onChange={e => setNewForm({...newForm, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body resize-none" /></div>
         <div className="flex gap-3 sticky bottom-0 bg-white pt-3 border-t"><button type="submit" disabled={saving} className="px-6 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold disabled:opacity-50">{saving ? 'Saving...' : 'Add & Sync to Kleegr'}</button><button type="button" onClick={() => setShowAdd(false)} className="px-6 py-2.5 border border-gray-200 text-gray-500 rounded-lg text-sm font-body">Cancel</button></div>
       </form></div></div>}
