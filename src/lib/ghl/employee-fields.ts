@@ -5,7 +5,7 @@ export interface EmployeeFieldConfig {
   key: string;
   ghlKey: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multiselect' | 'file';
+  type: 'text' | 'textarea' | 'number' | 'currency' | 'date' | 'select' | 'multiselect' | 'file' | 'phone' | 'county';
   placeholder?: string;
   required?: boolean;
   colSpan?: 1 | 2;
@@ -14,9 +14,9 @@ export interface EmployeeFieldConfig {
 }
 
 export const EMPLOYEE_FIELDS: EmployeeFieldConfig[] = [
-  { key: 'desired_salary', ghlKey: 'contact.desired_salary', label: 'Desired Salary', type: 'text', placeholder: 'e.g. $45,000/year or $20/hr', group: 'preferences' },
-  { key: 'salary_min', ghlKey: 'contact.salary_min', label: 'Salary Minimum', type: 'number', placeholder: 'e.g. 35000', group: 'preferences' },
-  { key: 'salary_max', ghlKey: 'contact.salary_max', label: 'Salary Maximum', type: 'number', placeholder: 'e.g. 55000', group: 'preferences' },
+  { key: 'desired_salary', ghlKey: 'contact.desired_salary', label: 'Desired Salary', type: 'currency', placeholder: '0.00', group: 'preferences' },
+  { key: 'salary_min', ghlKey: 'contact.salary_min', label: 'Salary Minimum', type: 'currency', placeholder: '0.00', group: 'preferences' },
+  { key: 'salary_max', ghlKey: 'contact.salary_max', label: 'Salary Maximum', type: 'currency', placeholder: '0.00', group: 'preferences' },
   { key: 'work_mode_preference', ghlKey: 'contact.work_mode_preference', label: 'Work Mode Preference', type: 'select', group: 'preferences', options: ['On Site', 'Remote', 'Hybrid'] },
   { key: 'preferred_job_types', ghlKey: 'contact.prefered_job_types', label: 'Preferred Job Types', type: 'multiselect', group: 'preferences', options: ['Full-Time', 'Part-Time', 'Contract', 'Seasonal', 'Internship'] },
   { key: 'preferred_industries', ghlKey: 'contact.prefered_industries', label: 'Preferred Industries', type: 'multiselect', group: 'preferences', options: ['Technology', 'Healthcare', 'Financial Services', 'Energy', 'Consumer Goods', 'Industrials', 'Real Estate', 'Telecommunications', 'E-Commerce & Retail', 'Logistics & Supply Chain', 'Construction & Engineering', 'Automotive', 'Hospitality', 'Media & Entertainment', 'Education', 'Agriculture', 'Chemicals', 'Environmental Services'] },
@@ -62,7 +62,7 @@ export function ghlCustomFieldsToApp(customFieldValues: Record<string, any>, fie
   for (const f of EMPLOYEE_FIELDS) {
     const ghlVal = ghlValues[f.ghlKey]; if (ghlVal === undefined) continue;
     if (f.type === 'multiselect') app[f.key] = typeof ghlVal === 'string' ? ghlVal.split(',').map(s => s.trim()).filter(Boolean) : ghlVal;
-    else if (f.type === 'number') app[f.key] = parseFloat(ghlVal) || null;
+    else if (f.type === 'number' || f.type === 'currency') app[f.key] = parseFloat(ghlVal) || null;
     else app[f.key] = ghlVal;
   }
   const statusReverseMap: Record<string, string> = { 'Submitted': 'submitted', 'Reviewing': 'reviewing', 'Interview': 'interview', 'Offered': 'offered', 'Hired': 'hired', 'Rejected': 'rejected', 'Withdrawn': 'withdrawn' };
