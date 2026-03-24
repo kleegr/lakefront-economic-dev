@@ -23,7 +23,6 @@ async function cfMap(): Promise<Record<string, string>> {
   if (!isGhlConfigured()) return {};
   try { const r = await fetch(`${BASE}/locations/${ghlConfig.locationId}/customFields`, { headers: h() }); const d = await r.json(); _cfMap = {}; for (const f of (d.customFields || [])) _cfMap[f.fieldKey] = f.id; return _cfMap; } catch { return {}; }
 }
-function cf(map: Record<string, string>, key: string, val: string) { const id = map[key]; return (id && val) ? { id, field_value: val } : null; }
 
 // 1. SYNC JOB -> Kleegr Job Opening (just the job record)
 export async function syncJobToGhlRecord(
@@ -51,18 +50,17 @@ export async function syncJobToGhlRecord(
 export async function syncJobWithEmployer(job: Record<string, any>, _employer: any) {
   const result = await syncJobToGhlRecord(job);
 
-  // After job is synced, associate the employer contact to the Job Opening
   if (result.success && result.ghlRecordId) {
     const employerGhlContactId = job.ghl_company_id;
     if (employerGhlContactId) {
-      const associated = await associateContactToJob(result.ghlRecordId, employerGhlContactId);
-      if (associated) {
+      const assocResult = await associateContactToJob(result.ghlRecordId, employerGhlContactId);
+      if (assocResult.ok) {
         await logSyncSuccess('job', 'employer_associated', {
           entity_id: job.id, ghl_id: result.ghlRecordId,
           details: { title: job.title, contactId: employerGhlContactId, company: job.company_name },
         });
       } else {
-        await logSyncError('job', 'employer_association_failed', 'Association API call failed', {
+        await logSyncError('job', 'employer_association_failed', assocResult.error || 'Unknown', {
           entity_id: job.id, ghl_id: result.ghlRecordId,
           details: { title: job.title, contactId: employerGhlContactId, company: job.company_name },
         });
@@ -73,7 +71,7 @@ export async function syncJobWithEmployer(job: Record<string, any>, _employer: a
   return result;
 }
 
-// 2. SYNC EMPLOYEE -> Kleegr (contact + opportunity with pipeline stage + associate to Job Opening)
+// 2. SYNC EMPLOYEE -> Kleegr
 export async function syncEmployeeToJob(
   app: Record<string, any>, job: Record<string, any> | null,
 ): Promise<{ contactId: string | null; opportunityId: string | null; success: boolean }> {
@@ -130,7 +128,7 @@ export async function syncEmployeeToJob(
   return { contactId, opportunityId, success: !!contactId };
 }
 
-// 3. SYNC EMPLOYER -> Kleegr contact ONLY (NO Job Opening association)
+// 3. SYNC EMPLOYER -> Kleegr contact ONLY
 export async function syncEmployerContact(
   employer: Record<string, any>, app: Record<string, any>,
 ): Promise<{ contactId: string | null; success: boolean }> {
@@ -240,20 +238,17 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
   return { action: 'passthrough' };
 }
 
-async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<boolean> {
-  if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return false;
+async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return { ok: false, error: 'Missing config or IDs' };
   const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
   const url = `${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`;
   const body = { locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] };
   try {
-    console.log(`Association API: POST ${url}`);
-    console.log(`Association body:`, JSON.stringify(body));
     const res = await fetch(url, { method: 'POST', headers: h(), body: JSON.stringify(body) });
     const responseText = await res.text().catch(() => '');
-    console.log(`Association response: ${res.status} ${responseText.substring(0, 500)}`);
-    if (!res.ok) return false;
-    return true;
-  } catch (e) { console.error('Association error:', e); return false; }
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 200)} | URL: ${url} | schemaKey: ${sk}` };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, error: `Exception: ${e?.message || String(e)}` }; }
 }
 
 async function findContactByEmail(email: string): Promise<string | null> {
