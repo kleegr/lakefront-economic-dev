@@ -1,5 +1,5 @@
-// GHL Job Sync — reads field config from Supabase lf_job_fields_config
-// No hardcoded field mappings — everything driven by the DB config
+// GHL Job Sync - reads field config from Supabase lf_job_fields_config
+// No hardcoded field mappings - everything driven by the DB config
 import { ghlConfig, isGhlConfigured } from './config';
 
 const SCHEMA_KEY = 'custom_objects.job_openings';
@@ -20,7 +20,7 @@ interface FieldConfig {
   options: Array<{ value: string; ghlLabel: string }>;
 }
 
-// Convert Supabase job → GHL properties using field config from DB
+// Convert Supabase job -> GHL properties using field config from DB
 export function jobToGhlProperties(job: Record<string, any>, fields: FieldConfig[]): Record<string, any> {
   const props: Record<string, any> = {};
   for (const f of fields) {
@@ -28,9 +28,10 @@ export function jobToGhlProperties(job: Record<string, any>, fields: FieldConfig
     const val = job[f.key];
     if (f.field_type === 'dropdown' && f.options?.length) {
       const opt = f.options.find(o => o.value === val);
-      if (opt) props[f.ghl_key] = [opt.ghlLabel];
-      else if (val) props[f.ghl_key] = [val];
-      else props[f.ghl_key] = [];
+      // GHL custom object fields expect a plain string for single-select dropdowns
+      if (opt) props[f.ghl_key] = opt.ghlLabel;
+      else if (val) props[f.ghl_key] = String(val);
+      else props[f.ghl_key] = '';
     } else if (f.field_type === 'date') {
       if (val) props[f.ghl_key] = val;
     } else if (f.field_type === 'number') {
@@ -42,13 +43,14 @@ export function jobToGhlProperties(job: Record<string, any>, fields: FieldConfig
   return props;
 }
 
-// Convert GHL properties → Supabase job using field config from DB
+// Convert GHL properties -> Supabase job using field config from DB
 export function ghlPropertiesToJob(props: Record<string, any>, fields: FieldConfig[]): Record<string, any> {
   const job: Record<string, any> = {};
   for (const f of fields) {
     if (!f.ghl_key) continue;
     const val = props[f.ghl_key];
     if (f.field_type === 'dropdown' && f.options?.length) {
+      // Handle both string and array responses from GHL
       const raw = Array.isArray(val) ? val[0] : val;
       const opt = f.options.find(o => o.ghlLabel === raw || o.value === raw);
       job[f.key] = opt?.value || raw || '';
@@ -94,7 +96,12 @@ export async function updateGhlJobRecord(recordId: string, job: Record<string, a
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      return { success: false, error: JSON.stringify(data?.message || data) };
+      const errMsg = JSON.stringify(data?.message || data);
+      // If record not found in GHL (deleted), clear the stale ID and return error
+      if (res.status === 404 || errMsg.includes('was not found')) {
+        return { success: false, error: `Record ${recordId} not found in GHL - needs re-creation` };
+      }
+      return { success: false, error: errMsg };
     }
     return { success: true };
   } catch (err: any) {
@@ -102,11 +109,19 @@ export async function updateGhlJobRecord(recordId: string, job: Record<string, a
   }
 }
 
-// Sync a job to GHL — creates or updates
+// Sync a job to GHL - creates or updates
+// If update fails with "not found", clears the stale ID and creates a new record
 export async function syncJobToGhl(job: Record<string, any>, fields: FieldConfig[], existingGhlId?: string | null): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) return { ghlRecordId: null, success: false, error: 'GHL not configured' };
   if (existingGhlId) {
     const result = await updateGhlJobRecord(existingGhlId, job, fields);
+    if (result.success) return { ghlRecordId: existingGhlId, success: true };
+    // If record was not found (deleted in GHL), create a new one
+    if (result.error?.includes('not found') || result.error?.includes('was not found')) {
+      console.log(`GHL record ${existingGhlId} not found, creating new record for "${job.title}"`);
+      const createResult = await createGhlJobRecord(job, fields);
+      return { ghlRecordId: createResult.recordId, success: createResult.success, error: createResult.error };
+    }
     return { ghlRecordId: existingGhlId, ...result };
   } else {
     const result = await createGhlJobRecord(job, fields);
