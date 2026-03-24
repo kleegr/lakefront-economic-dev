@@ -40,7 +40,7 @@ export default function SyncStatusPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-brand-forest">Kleegr Sync Status</h1>
-          <p className="text-sm font-body text-gray-400 mt-1">Real-time view of all GHL/Kleegr sync operations \u2014 every move logged</p>
+          <p className="text-sm font-body text-gray-400 mt-1">Real-time view of all GHL/Kleegr sync operations - every move logged</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-xs font-body text-gray-500 cursor-pointer"><input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} className="rounded border-gray-300" />Auto-refresh</label>
@@ -52,9 +52,9 @@ export default function SyncStatusPage() {
         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-brand-forest">{stats?.last_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Last 24h</p></div>
         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-green-600">{stats?.success_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Success</p></div>
         <div className={`bg-white rounded-xl border p-4 text-center ${errorCount > 0 ? 'border-red-200' : ''}`}><div className={`text-2xl font-display font-bold ${errorCount > 0 ? 'text-red-600' : 'text-gray-300'}`}>{errorCount}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Errors</p></div>
-        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-blue-600">{stats?.outbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Portal \u2192 GHL</p></div>
-        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-amber-600">{stats?.inbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">GHL \u2192 Portal</p></div>
-        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-xs font-body font-semibold text-brand-forest mt-1">{stats?.last_sync ? new Date(stats.last_sync).toLocaleTimeString() : '\u2014'}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Last Sync</p></div>
+        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-blue-600">{stats?.outbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'Portal -> GHL'}</p></div>
+        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-amber-600">{stats?.inbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'GHL -> Portal'}</p></div>
+        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-xs font-body font-semibold text-brand-forest mt-1">{stats?.last_sync ? new Date(stats.last_sync).toLocaleTimeString() : '-'}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Last Sync</p></div>
       </div>
 
       {stats?.last_error?.error && (
@@ -63,7 +63,7 @@ export default function SyncStatusPage() {
           <div>
             <p className="text-sm font-body font-semibold text-red-700">Last Error: {stats.last_error.action}</p>
             <p className="text-xs font-body text-red-600 mt-1">{stats.last_error.error}</p>
-            <p className="text-[10px] font-body text-red-400 mt-1">{stats.last_error.entity} \u00b7 {stats.last_error.time ? new Date(stats.last_error.time).toLocaleString() : ''}</p>
+            <p className="text-[10px] font-body text-red-400 mt-1">{stats.last_error.entity} | {stats.last_error.time ? new Date(stats.last_error.time).toLocaleString() : ''}</p>
           </div>
         </div>
       )}
@@ -71,7 +71,7 @@ export default function SyncStatusPage() {
       <div className="flex gap-2 flex-wrap">
         <select value={filter.status} onChange={e => setFilter(f => ({...f, status: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Status</option><option value="success">Success</option><option value="error">Errors</option><option value="skipped">Skipped</option></select>
         <select value={filter.entity_type} onChange={e => setFilter(f => ({...f, entity_type: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Types</option><option value="application">Employee/Application</option><option value="job">Job</option><option value="employer">Employer</option><option value="webhook_inbound">Webhook Inbound</option></select>
-        <select value={filter.direction} onChange={e => setFilter(f => ({...f, direction: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">Portal \u2192 GHL</option><option value="inbound">GHL \u2192 Portal</option></select>
+        <select value={filter.direction} onChange={e => setFilter(f => ({...f, direction: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">{'Portal -> GHL'}</option><option value="inbound">{'GHL -> Portal'}</option></select>
         {(filter.status || filter.entity_type || filter.direction) && (<button onClick={() => setFilter({ status: '', entity_type: '', direction: '' })} className="text-xs text-brand-forest font-body underline">Clear filters</button>)}
       </div>
 
@@ -90,8 +90,8 @@ export default function SyncStatusPage() {
                     <td className="p-3"><span className={`px-2 py-0.5 text-[10px] rounded-full font-semibold ${ENTITY_COLORS[log.entity_type] || 'bg-gray-100 text-gray-500'}`}>{log.entity_type}</span></td>
                     <td className="p-3 text-xs font-mono text-brand-forest">{log.action}</td>
                     <td className="p-3"><span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full font-semibold ${STATUS_COLORS[log.status]}`}>{log.status === 'success' ? <CheckCircle className="w-3 h-3" /> : log.status === 'error' ? <XCircle className="w-3 h-3" /> : null}{log.status}</span></td>
-                    <td className="p-3 text-xs text-gray-500 max-w-[250px]">{log.error_message ? (<span className="text-red-600">{log.error_message.substring(0, 80)}</span>) : log.details ? (<span className="text-gray-400">{JSON.stringify(log.details).substring(0, 80)}</span>) : '\u2014'}</td>
-                    <td className="p-3 text-[10px] font-mono text-gray-400">{log.ghl_id ? log.ghl_id.substring(0, 12) + '...' : '\u2014'}</td>
+                    <td className="p-3 text-xs text-gray-500 max-w-[250px]">{log.error_message ? (<span className="text-red-600">{log.error_message.substring(0, 80)}</span>) : log.details ? (<span className="text-gray-400">{JSON.stringify(log.details).substring(0, 80)}</span>) : '-'}</td>
+                    <td className="p-3 text-[10px] font-mono text-gray-400">{log.ghl_id ? log.ghl_id.substring(0, 12) + '...' : '-'}</td>
                     <td className="p-3 text-xs text-gray-400">{new Date(log.created_at).toLocaleString()}</td>
                   </tr>
                 );
