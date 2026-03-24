@@ -1,10 +1,21 @@
-// JOB ↔ EMPLOYEE ↔ EMPLOYER — 2-Way Sync via GHL Job Openings Custom Object
-// Every sync operation is logged to lf_sync_log for the Sync Status dashboard
+// JOB OPENINGS = ONLY for job posts. Employee contacts get associated to jobs.
+// Employer contacts are just GHL contacts - NOT associated to Job Openings.
+//
+// Portal -> GHL:
+//   1. Job created/edited -> upsert Job Opening record (NO employer association)
+//   2. Employee applies -> upsert contact, create ATS opportunity, associate EMPLOYEE to Job Opening
+//   3. Employer applies -> upsert contact with employer custom fields (NO job association)
+//
+// GHL -> Portal (webhook):
+//   4. Job Opening edited in GHL -> update lf_jobs
+//   5. Opportunity moved in pipeline -> update lf_applications.status
+//   6. Employee contact associated to Job Opening -> create lf_job_assignments
 
 import { ghlConfig, isGhlConfigured } from './config';
 import { syncJobToGhl } from './job-sync';
 import { getFieldsConfig } from './get-fields-config';
 import { appToGhlCustomFields, ghlCustomFieldsToApp } from './employee-fields';
+import { employerAppToGhlCustomFields } from './employer-fields';
 import { logSyncSuccess, logSyncError, logSyncInbound } from './sync-logger';
 
 const BASE = 'https://services.leadconnectorhq.com';
@@ -18,10 +29,9 @@ async function cfMap(): Promise<Record<string, string>> {
 }
 function cf(map: Record<string, string>, key: string, val: string) { const id = map[key]; return (id && val) ? { id, field_value: val } : null; }
 
-// 1. SYNC JOB → GHL (create/update Job Opening + associate employer)
-export async function syncJobWithEmployer(
+// 1. SYNC JOB -> GHL Job Opening (ONLY the job record, no contact associations)
+export async function syncJobToGhlRecord(
   job: Record<string, any>,
-  employer: { kleegr_contact_id?: string; full_name?: string; email?: string; company_name?: string } | null,
 ): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
   if (!isGhlConfigured()) {
     await logSyncError('job', 'job_sync', 'GHL not configured', { entity_id: job.id, details: { title: job.title } });
@@ -36,19 +46,20 @@ export async function syncJobWithEmployer(
   const ghlRecordId = jobSync.ghlRecordId || job.ghl_record_id;
   await logSyncSuccess('job', job.ghl_record_id ? 'job_updated' : 'job_created', {
     entity_id: job.id, ghl_id: ghlRecordId || undefined,
-    details: { title: job.title, employer: employer?.full_name || employer?.email },
+    details: { title: job.title, company: job.company_name },
   });
-  if (ghlRecordId && employer?.kleegr_contact_id) {
-    await associateContactToJob(ghlRecordId, employer.kleegr_contact_id);
-    await logSyncSuccess('employer', 'employer_associated_to_job', {
-      entity_id: employer.kleegr_contact_id, ghl_id: ghlRecordId,
-      details: { employer: employer.full_name, job: job.title },
-    });
-  }
   return { ghlRecordId, success: true };
 }
 
-// 2. SYNC EMPLOYEE APPLICATION → GHL (contact + opportunity + job association)
+// Keep old name as alias for backward compat (jobs/[id]/route.ts etc)
+export async function syncJobWithEmployer(
+  job: Record<string, any>,
+  _employer: any,
+): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
+  return syncJobToGhlRecord(job);
+}
+
+// 2. SYNC EMPLOYEE -> GHL (contact + opportunity + associate to Job Opening)
 export async function syncEmployeeToJob(
   app: Record<string, any>, job: Record<string, any> | null,
 ): Promise<{ contactId: string | null; opportunityId: string | null; success: boolean }> {
@@ -74,13 +85,14 @@ export async function syncEmployeeToJob(
   let opportunityId = app.ghl_opportunity_id || null;
   if (contactId && job?.id && ghlConfig.pipelines.ats) {
     try {
-      const oppName = `${app.applicant_name || 'Applicant'} \u2192 ${job.title || 'Job'}`;
+      const oppName = `${app.applicant_name || 'Applicant'} -> ${job.title || 'Job'}`;
       const oppStatus = ['hired', 'offered'].includes(app.status) ? 'won' : app.status === 'rejected' ? 'lost' : 'open';
       if (opportunityId) { await fetch(`${BASE}/opportunities/${opportunityId}`, { method: 'PUT', headers: h(), body: JSON.stringify({ status: oppStatus, name: oppName }) }); }
       else { const r = await fetch(`${BASE}/opportunities/`, { method: 'POST', headers: h(), body: JSON.stringify({ locationId: ghlConfig.locationId, pipelineId: ghlConfig.pipelines.ats, name: oppName, contactId, status: oppStatus }) }); const d = await r.json(); opportunityId = d?.opportunity?.id || null; }
     } catch (e) { console.error('Opportunity sync failed:', e); }
   }
 
+  // EMPLOYEE contacts DO get associated to Job Openings
   if (contactId && job?.ghl_record_id) await associateContactToJob(job.ghl_record_id, contactId);
 
   if (contactId) {
@@ -93,24 +105,24 @@ export async function syncEmployeeToJob(
       entity_id: app.id, details: { name: app.applicant_name, email: app.applicant_email },
     });
   }
-
   return { contactId, opportunityId, success: !!contactId };
 }
 
-// 3. SYNC EMPLOYER → GHL (upsert contact + associate to job)
-export async function syncEmployerToJob(
-  employer: Record<string, any>, job: Record<string, any> | null,
+// 3. SYNC EMPLOYER -> GHL contact ONLY (NO Job Opening association)
+// Employer is just a contact with employer custom fields
+export async function syncEmployerContact(
+  employer: Record<string, any>,
+  app: Record<string, any>,
 ): Promise<{ contactId: string | null; success: boolean }> {
   if (!isGhlConfigured()) return { contactId: null, success: false };
   const map = await cfMap();
   const nameParts = (employer.full_name || '').split(' ');
-  const customFields: Array<{ id: string; field_value: string }> = [];
-  const add = (k: string, v: string) => { const e = cf(map, k, v); if (e) customFields.push(e); };
-  add('contact.contact_type', 'Employer');
-  if (employer.company_name) add('contact.employer_company', employer.company_name);
-  if (job?.title) add('contact.position_applied_for', job.title);
-  if (job?.id) add('contact.supabase_job_id', job.id);
-  const tags = ['lakefront-employer']; if (job?.title) tags.push(`job-owner:${job.title.substring(0, 40)}`);
+
+  // Use employer field config for custom fields
+  const customFields = employerAppToGhlCustomFields(app, map);
+
+  const tags = ['lakefront-employer'];
+  if (employer.company_name) tags.push(`company:${employer.company_name.substring(0, 40)}`);
 
   let contactId = employer.kleegr_contact_id || null;
   try {
@@ -118,15 +130,28 @@ export async function syncEmployerToJob(
     if (contactId) { await fetch(`${BASE}/contacts/${contactId}`, { method: 'PUT', headers: h(), body: JSON.stringify(cd) }); }
     else { const ex = await findContactByEmail(employer.email); if (ex) { contactId = ex; await fetch(`${BASE}/contacts/${contactId}`, { method: 'PUT', headers: h(), body: JSON.stringify(cd) }); } else { const r = await fetch(`${BASE}/contacts/`, { method: 'POST', headers: h(), body: JSON.stringify(cd) }); const d = await r.json(); contactId = d?.contact?.id || null; } }
   } catch (e) { console.error('Employer contact sync failed:', e); }
-  if (contactId && job?.ghl_record_id) await associateContactToJob(job.ghl_record_id, contactId);
+
+  // NO association to Job Openings - employer is just a contact
+  if (contactId) {
+    await logSyncSuccess('employer', 'employer_contact_created', {
+      entity_id: app.id, ghl_id: contactId,
+      details: { name: employer.full_name, company: employer.company_name },
+    });
+  }
   return { contactId, success: !!contactId };
 }
 
-// 4. GHL → PORTAL: Process inbound webhook
+// Keep old name for backward compat
+export async function syncEmployerToJob(
+  employer: Record<string, any>, _job: Record<string, any> | null,
+): Promise<{ contactId: string | null; success: boolean }> {
+  return syncEmployerContact(employer, employer);
+}
+
+// 4. GHL -> PORTAL: Process inbound webhook
 export async function processGhlWebhook(body: any, supabase: any): Promise<{ action: string; details?: any }> {
   const eventType = body.type || body.event || '';
 
-  // A. Opportunity status changed
   if (eventType === 'OpportunityStatusUpdate' || eventType === 'OpportunityStageUpdate') {
     const contactId = body.contactId || body.contact_id || body.data?.contactId;
     const oppStatus = body.status || body.data?.status;
@@ -138,13 +163,12 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
     const ns = statusMap[oppStatus];
     if (ns && ns !== app.status) {
       await supabase.from('lf_applications').update({ status: ns, updated_at: new Date().toISOString(), ghl_opportunity_id: oppId || undefined }).eq('id', app.id);
-      await logSyncInbound('opportunity_status_synced', { entity_id: app.id, ghl_id: contactId, details: { from: app.status, to: ns, opportunityId: oppId } });
+      await logSyncInbound('opportunity_status_synced', { entity_id: app.id, ghl_id: contactId, details: { from: app.status, to: ns } });
       return { action: 'status_synced', details: { from: app.status, to: ns } };
     }
     return { action: 'status_unchanged' };
   }
 
-  // B. Contact updated in GHL → sync all employee fields back
   if (eventType === 'ContactUpdate') {
     const contactId = body.contactId || body.contact_id || body.id || body.data?.contactId || body.data?.id;
     const customFieldValues = body.customFields || body.customField || body.data?.customFields || body.data?.customField || [];
@@ -163,40 +187,35 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
     return { action: 'no_field_changes' };
   }
 
-  // C. Contact associated to Job Opening
+  // Employee associated to Job Opening (only employees, not employers)
   if (eventType === 'CustomObjectAssociation') {
     const recordId = body.recordId || body.data?.recordId;
     const contactId = body.contactId || body.data?.contactId;
     if (!recordId || !contactId) return { action: 'ignored' };
     const { data: job } = await supabase.from('lf_jobs').select('id, employer_id').eq('ghl_record_id', recordId).maybeSingle();
     if (!job) return { action: 'no_matching_job' };
-    const { data: profile } = await supabase.from('lf_profiles').select('id, role').eq('kleegr_contact_id', contactId).maybeSingle();
-    if (profile) {
-      const role = ['employer', 'admin', 'super_admin'].includes(profile.role) ? 'employer' : 'employee';
-      await supabase.from('lf_job_assignments').upsert({ job_id: job.id, employee_id: profile.id, employer_id: role === 'employer' ? profile.id : job.employer_id, role, status: 'active' }, { onConflict: 'job_id,employee_id,role' });
-      await logSyncInbound('contact_associated_to_job', { entity_id: job.id, ghl_id: contactId, details: { role, profileId: profile.id } });
-      return { action: 'assignment_created', details: { role } };
+    // Find employee application by ghl_contact_id
+    const { data: app } = await supabase.from('lf_applications').select('id, applicant_id, application_type').eq('ghl_contact_id', contactId).maybeSingle();
+    if (app && app.application_type === 'employee') {
+      if (app.applicant_id) {
+        await supabase.from('lf_job_assignments').upsert({ job_id: job.id, employee_id: app.applicant_id, employer_id: job.employer_id, application_id: app.id, role: 'employee', status: 'active' }, { onConflict: 'job_id,employee_id,role' });
+      }
+      await logSyncInbound('employee_associated_to_job', { entity_id: job.id, ghl_id: contactId });
+      return { action: 'employee_assignment_created' };
     }
-    const { data: app } = await supabase.from('lf_applications').select('id, applicant_id').eq('ghl_contact_id', contactId).maybeSingle();
-    if (app?.applicant_id) {
-      await supabase.from('lf_job_assignments').upsert({ job_id: job.id, employee_id: app.applicant_id, employer_id: job.employer_id, application_id: app.id, role: 'employee', status: 'active' }, { onConflict: 'job_id,employee_id,role' });
-      await logSyncInbound('contact_associated_via_app', { entity_id: job.id, ghl_id: contactId, details: { appId: app.id } });
-      return { action: 'assignment_from_app' };
-    }
-    return { action: 'contact_not_found' };
+    return { action: 'not_employee_contact' };
   }
 
-  // D. Contact disassociated from Job Opening
   if (eventType === 'CustomObjectDisassociation') {
     const recordId = body.recordId || body.data?.recordId;
     const contactId = body.contactId || body.data?.contactId;
     if (!recordId || !contactId) return { action: 'ignored' };
     const { data: job } = await supabase.from('lf_jobs').select('id').eq('ghl_record_id', recordId).maybeSingle();
     if (!job) return { action: 'no_matching_job' };
-    const { data: profile } = await supabase.from('lf_profiles').select('id').eq('kleegr_contact_id', contactId).maybeSingle();
-    if (profile) {
-      await supabase.from('lf_job_assignments').delete().eq('job_id', job.id).eq('employee_id', profile.id);
-      await logSyncInbound('contact_disassociated_from_job', { entity_id: job.id, ghl_id: contactId });
+    const { data: app } = await supabase.from('lf_applications').select('id, applicant_id').eq('ghl_contact_id', contactId).maybeSingle();
+    if (app?.applicant_id) {
+      await supabase.from('lf_job_assignments').delete().eq('job_id', job.id).eq('employee_id', app.applicant_id);
+      await logSyncInbound('employee_disassociated_from_job', { entity_id: job.id, ghl_id: contactId });
       return { action: 'assignment_removed' };
     }
     return { action: 'contact_not_found' };
@@ -205,6 +224,7 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
   return { action: 'passthrough' };
 }
 
+// Only EMPLOYEE contacts get associated to Job Openings
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<boolean> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return false;
   const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
