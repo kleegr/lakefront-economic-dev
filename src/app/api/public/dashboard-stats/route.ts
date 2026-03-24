@@ -1,60 +1,31 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ghlConfig, isGhlConfigured } from '@/lib/ghl/config';
-import { ghl } from '@/lib/ghl/client';
+export const dynamic = 'force-dynamic';
 
-// Portal dashboard stats: combines Supabase + GHL data
-
+// Portal dashboard stats: combines Supabase + Kleegr data
 export async function GET() {
-  try {
-    const supabase = await createServerSupabase();
-
-    // Supabase stats
-    const [jobsRes, usersRes, pendingRes] = await Promise.allSettled([
-      supabase.from('lf_jobs').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-      supabase.from('lf_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('lf_profiles').select('*', { count: 'exact', head: true }).eq('account_status', 'pending'),
-    ]);
-
-    const totalJobs = jobsRes.status === 'fulfilled' ? (jobsRes.value.count || 0) : 0;
-    const totalUsers = usersRes.status === 'fulfilled' ? (usersRes.value.count || 0) : 0;
-    const pendingApprovals = pendingRes.status === 'fulfilled' ? (pendingRes.value.count || 0) : 0;
-
-    // GHL stats (if configured)
-    let ghlStats = null;
-    if (isGhlConfigured()) {
-      try {
-        const [contactsRes, pipelinesRes] = await Promise.allSettled([
-          ghl.getContacts({ limit: '1' }),
-          ghl.getPipelines(),
-        ]);
-        ghlStats = {
-          totalContacts: contactsRes.status === 'fulfilled' ? (contactsRes.value?.meta?.total || 0) : 0,
-          pipelines: pipelinesRes.status === 'fulfilled' ? (pipelinesRes.value?.pipelines || []).map((p: any) => ({
-            name: p.name,
-            id: p.id,
-            stages: p.stages?.length || 0,
-          })) : [],
-        };
-      } catch {
-        ghlStats = null;
-      }
-    }
-
-    return NextResponse.json({
-      totalJobs,
-      totalUsers,
-      pendingApprovals,
-      ghlConfigured: isGhlConfigured(),
-      ghl: ghlStats,
-    });
-  } catch (err) {
-    return NextResponse.json({
-      totalJobs: 0,
-      totalUsers: 0,
-      pendingApprovals: 0,
-      ghlConfigured: false,
-      ghl: null,
-    });
+  const supabase = await createServerSupabase();
+  const stats: Record<string, any> = {};
+  const { count: jobCount } = await supabase.from('lf_jobs').select('*', { count: 'exact', head: true });
+  stats.totalJobs = jobCount || 0;
+  const { count: pubCount } = await supabase.from('lf_jobs').select('*', { count: 'exact', head: true }).eq('status', 'published');
+  stats.publishedJobs = pubCount || 0;
+  const { count: appCount } = await supabase.from('lf_applications').select('*', { count: 'exact', head: true });
+  stats.totalApplications = appCount || 0;
+  const { count: pendingCount } = await supabase.from('lf_applications').select('*', { count: 'exact', head: true }).in('status', ['submitted', 'reviewing']);
+  stats.pendingApplications = pendingCount || 0;
+  const { count: userCount } = await supabase.from('lf_profiles').select('*', { count: 'exact', head: true });
+  stats.totalUsers = userCount || 0;
+  const { data: recentApps } = await supabase.from('lf_applications').select('id, applicant_name, applicant_email, status, application_type, created_at').order('created_at', { ascending: false }).limit(5);
+  stats.recentApplications = recentApps || [];
+  // Kleegr stats (if configured)
+  if (isGhlConfigured()) {
+    try {
+      const res = await fetch(`https://services.leadconnectorhq.com/contacts/?locationId=${ghlConfig.locationId}&limit=1`, { headers: { 'Authorization': `Bearer ${ghlConfig.token}`, 'Version': '2021-07-28' } });
+      const data = await res.json();
+      stats.ghlContacts = data?.meta?.total || data?.total || 0;
+    } catch { stats.ghlContacts = 0; }
   }
+  return NextResponse.json(stats);
 }
