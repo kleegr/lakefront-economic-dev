@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ghlPropertiesToJob } from '@/lib/ghl/job-sync';
 import { getFieldsConfig } from '@/lib/ghl/get-fields-config';
+import { processGhlWebhook } from '@/lib/ghl/job-association-sync';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = await createServerSupabase();
   const eventType = body.type || body.event || '';
-  if (eventType === 'ContactUpdate' || eventType === 'OpportunityStatusUpdate') {
-    return handleContactOrOppUpdate(body, supabase);
+
+  if (['OpportunityStatusUpdate', 'OpportunityStageUpdate', 'ContactUpdate', 'CustomObjectAssociation'].includes(eventType)) {
+    const result = await processGhlWebhook(body, supabase);
+    return NextResponse.json({ ok: true, ...result });
   }
 
   const fields = await getFieldsConfig();
@@ -24,32 +27,14 @@ export async function POST(req: NextRequest) {
     for (const f of fields) { if (f.key === 'id' || f.field_type === 'hidden') continue; if (jobData[f.key] !== undefined) updateData[f.key] = jobData[f.key] || null; }
     const { error } = await supabase.from('lf_jobs').update(updateData).eq('id', jobData.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, action: 'updated', jobId: jobData.id });
+    return NextResponse.json({ ok: true, action: 'job_updated', jobId: jobData.id });
   } else {
     const slug = jobData.title ? String(jobData.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
-    const insertData: Record<string, any> = { slug, is_public: true, approval_status: 'approved', ghl_record_id: ghlRecordId, ghl_synced_at: new Date().toISOString() };
-    for (const f of fields) { if (f.key === 'id' || f.field_type === 'hidden') continue; insertData[f.key] = jobData[f.key] || null; }
-    if (!insertData.title) insertData.title = 'Untitled Job';
-    if (!insertData.status) insertData.status = 'draft';
-    if (!insertData.visibility) insertData.visibility = 'public';
-    const { data: newJob, error } = await supabase.from('lf_jobs').insert(insertData).select().single();
+    const ins: Record<string, any> = { slug, is_public: true, approval_status: 'approved', ghl_record_id: ghlRecordId, ghl_synced_at: new Date().toISOString() };
+    for (const f of fields) { if (f.key === 'id' || f.field_type === 'hidden') continue; ins[f.key] = jobData[f.key] || null; }
+    if (!ins.title) ins.title = 'Untitled Job'; if (!ins.status) ins.status = 'draft'; if (!ins.visibility) ins.visibility = 'public';
+    const { data: newJob, error } = await supabase.from('lf_jobs').insert(ins).select().single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, action: 'created', jobId: newJob?.id });
+    return NextResponse.json({ ok: true, action: 'job_created', jobId: newJob?.id });
   }
-}
-
-async function handleContactOrOppUpdate(body: any, supabase: any) {
-  const contactId = body.contactId || body.contact_id || body.data?.contactId;
-  const oppStatus = body.status || body.data?.status;
-  if (!contactId) return NextResponse.json({ ok: true, action: 'ignored' });
-  const { data: app } = await supabase.from('lf_applications').select('id, status, job_id').eq('ghl_contact_id', contactId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-  if (!app) return NextResponse.json({ ok: true, action: 'no_matching_app' });
-  if (oppStatus) {
-    const statusMap: Record<string, string> = { open: 'reviewing', won: 'hired', lost: 'rejected', abandoned: 'withdrawn' };
-    const newStatus = statusMap[oppStatus];
-    if (newStatus && newStatus !== app.status) {
-      await supabase.from('lf_applications').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', app.id);
-    }
-  }
-  return NextResponse.json({ ok: true, action: 'synced', applicationId: app.id });
 }

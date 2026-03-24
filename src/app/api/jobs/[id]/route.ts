@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { syncJobToGhl } from '@/lib/ghl/job-sync';
-import { getFieldsConfig } from '@/lib/ghl/get-fields-config';
-import { syncJobAssociationsToGhl } from '@/lib/ghl/association-sync';
+import { syncJobWithEmployer } from '@/lib/ghl/job-association-sync';
 
 function cleanValue(val: any, fieldName: string): any {
   const dateFields = ['closing_date', 'posted_date'];
@@ -32,9 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const allowedFields = ['title', 'description', 'company_name', 'location', 'job_type', 'salary_range',
     'requirements', 'benefits', 'category', 'compensation_type', 'work_mode', 'department',
     'status', 'visibility', 'is_public', 'closing_date', 'openings_count', 'skills_required', 'special_offer'];
-  for (const field of allowedFields) {
-    if (body[field] !== undefined) updateData[field] = cleanValue(body[field], field);
-  }
+  for (const field of allowedFields) { if (body[field] !== undefined) updateData[field] = cleanValue(body[field], field); }
   if (body.status === 'published') updateData.posted_date = new Date().toISOString().split('T')[0];
   if (body.title) updateData.slug = body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -43,16 +39,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   let ghlSynced = false;
   if (job) {
-    const fields = await getFieldsConfig();
-    const syncResult = await syncJobToGhl(job, fields, job.ghl_record_id);
-    ghlSynced = syncResult.success;
-    if (ghlSynced && syncResult.ghlRecordId) {
-      await supabase.from('lf_jobs').update({ ghl_record_id: syncResult.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', id);
-      const employerId = job.employer_id || job.created_by;
-      if (employerId) {
-        const { data: employer } = await supabase.from('lf_profiles').select('id, full_name, email, kleegr_contact_id, company_name').eq('id', employerId).single();
-        if (employer) await syncJobAssociationsToGhl({ ...job, ghl_record_id: syncResult.ghlRecordId }, employer);
-      }
+    const employerId = job.employer_id || job.created_by;
+    let employer = null;
+    if (employerId) { const { data: emp } = await supabase.from('lf_profiles').select('id, full_name, email, phone, kleegr_contact_id, company_name').eq('id', employerId).single(); employer = emp; }
+    const sync = await syncJobWithEmployer(job, employer);
+    ghlSynced = sync.success;
+    if (ghlSynced && sync.ghlRecordId && sync.ghlRecordId !== job.ghl_record_id) {
+      await supabase.from('lf_jobs').update({ ghl_record_id: sync.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', id);
     }
   }
   return NextResponse.json({ job, ghlSynced });

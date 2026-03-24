@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { syncJobToGhl, fetchAllGhlJobs, ghlPropertiesToJob } from '@/lib/ghl/job-sync';
+import { syncJobWithEmployer } from '@/lib/ghl/job-association-sync';
+import { fetchAllGhlJobs, ghlPropertiesToJob } from '@/lib/ghl/job-sync';
 import { getFieldsConfig } from '@/lib/ghl/get-fields-config';
 
 export async function POST(req: NextRequest) {
@@ -18,15 +19,12 @@ export async function POST(req: NextRequest) {
   if (direction === 'push' || direction === 'both') {
     const { data: jobs } = await supabase.from('lf_jobs').select('*');
     for (const job of (jobs || [])) {
-      const syncResult = await syncJobToGhl(job, fields, job.ghl_record_id);
-      if (syncResult.success) {
-        results.pushed++;
-        if (syncResult.ghlRecordId) {
-          await supabase.from('lf_jobs').update({ ghl_record_id: syncResult.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', job.id);
-        }
-      } else {
-        results.errors.push(`Push failed for "${job.title}": ${syncResult.error}`);
-      }
+      const eid = job.employer_id || job.created_by;
+      let employer = null;
+      if (eid) { const { data: emp } = await supabase.from('lf_profiles').select('id, full_name, email, phone, kleegr_contact_id, company_name').eq('id', eid).single(); employer = emp; }
+      const sync = await syncJobWithEmployer(job, employer);
+      if (sync.success) { results.pushed++; if (sync.ghlRecordId) await supabase.from('lf_jobs').update({ ghl_record_id: sync.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', job.id); }
+      else results.errors.push(`Push failed for "${job.title}": ${sync.error}`);
     }
   }
 
@@ -36,25 +34,14 @@ export async function POST(req: NextRequest) {
       const jobData = ghlPropertiesToJob(record.properties, fields);
       if (!jobData.title) continue;
       if (jobData.id) {
-        const { error } = await supabase.from('lf_jobs').update({
-          ...jobData, ghl_record_id: record.id, ghl_synced_at: new Date().toISOString(),
-        }).eq('id', jobData.id);
-        if (!error) results.pulled++;
-        else results.errors.push(`Pull update failed: ${error.message}`);
+        const { error } = await supabase.from('lf_jobs').update({ ...jobData, ghl_record_id: record.id, ghl_synced_at: new Date().toISOString() }).eq('id', jobData.id);
+        if (!error) results.pulled++; else results.errors.push(`Pull update: ${error.message}`);
       } else {
-        const slug = jobData.title ? String(jobData.title).toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
-        const { error } = await supabase.from('lf_jobs').insert({
-          title: jobData.title, company_name: jobData.company_name || null,
-          location: jobData.location || 'Lakefront Estates, Okeechobee, FL',
-          category: jobData.category || 'General', job_type: jobData.job_type || 'full-time',
-          status: 'draft', visibility: 'public', slug, is_public: true, approval_status: 'approved',
-          ghl_record_id: record.id, ghl_synced_at: new Date().toISOString(),
-        });
-        if (!error) results.pulled++;
-        else results.errors.push(`Pull create failed: ${error.message}`);
+        const slug = String(jobData.title).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const { error } = await supabase.from('lf_jobs').insert({ title: jobData.title, company_name: jobData.company_name || null, location: jobData.location || 'Lakefront Estates, Okeechobee, FL', category: jobData.category || 'General', job_type: jobData.job_type || 'full-time', status: 'draft', visibility: 'public', slug, is_public: true, approval_status: 'approved', ghl_record_id: record.id, ghl_synced_at: new Date().toISOString() });
+        if (!error) results.pulled++; else results.errors.push(`Pull create: ${error.message}`);
       }
     }
   }
-
   return NextResponse.json({ success: true, ...results });
 }
