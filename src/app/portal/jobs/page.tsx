@@ -38,7 +38,6 @@ export default function AdminJobsPage() {
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { const h = (e: MouseEvent) => { if (empRef.current && !empRef.current.contains(e.target as Node)) setShowEmpDD(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
-  // LIVE AUTO-SYNC: runs every 5 seconds, syncs changed jobs to Kleegr and checks for deletions
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -46,14 +45,12 @@ export default function AdminJobsPage() {
         const res = await fetch('/api/jobs/auto-sync');
         if (res.ok) {
           const data = await res.json();
-          // If anything was pushed or deleted, refresh the jobs list
           if (data.pushed > 0 || data.deleted > 0) {
             const parts: string[] = [];
             if (data.pushed) parts.push(`Synced ${data.pushed} jobs`);
             if (data.deleted) parts.push(`Removed ${data.deleted} from Kleegr`);
             setSyncMsg(parts.join('. '));
             loadAll();
-            // Clear message after 5 seconds
             setTimeout(() => setSyncMsg(''), 5000);
           }
           lastSyncRef.current = data.timestamp || '';
@@ -72,7 +69,7 @@ export default function AdminJobsPage() {
   function buildEmptyForm() { const f: Record<string, any> = {}; for (const field of formFields) { if (field.field_type === 'number') f[field.key] = field.key === 'openings_count' ? 1 : 0; else if (field.key === 'status') f[field.key] = 'published'; else if (field.key === 'visibility') f[field.key] = 'public'; else if (field.key === 'location') f[field.key] = 'Lakefront Estates, Okeechobee, FL'; else f[field.key] = ''; } return f; }
   function openNew() { setEditingJob(null); setForm(buildEmptyForm()); setEmployerQuery(''); setSelectedEmp(null); setShowForm(true); searchEmp(''); }
   function openEdit(job: any) { setEditingJob(job); const f: Record<string, any> = {}; for (const field of formFields) f[field.key] = job[field.key] ?? ''; setForm(f); setEmployerQuery(job.company_name || ''); setSelectedEmp(null); setShowForm(true); }
-  async function saveJob(e: React.FormEvent) { e.preventDefault(); setSaving(true); const url = editingJob ? `/api/jobs/${editingJob.id}` : '/api/jobs'; const method = editingJob ? 'PUT' : 'POST'; const payload: Record<string, any> = { ...form }; if (selectedEmp) payload.employer_link = { id: selectedEmp.id, source: selectedEmp.source, ghl_contact_id: selectedEmp.ghl_contact_id, contact_name: selectedEmp.contact_name, email: selectedEmp.email, phone: selectedEmp.phone }; const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (res.ok) { setShowForm(false); loadAll(); } else { const d = await res.json(); alert(d.error || 'Failed'); } setSaving(false); }
+  async function saveJob(e: React.FormEvent) { e.preventDefault(); setSaving(true); const url = editingJob ? `/api/jobs/${editingJob.id}` : '/api/jobs'; const method = editingJob ? 'PUT' : 'POST'; const payload: Record<string, any> = { ...form }; if (selectedEmp) { payload.employer_link = { id: selectedEmp.id, source: selectedEmp.source, ghl_contact_id: selectedEmp.ghl_contact_id, contact_name: selectedEmp.contact_name, email: selectedEmp.email, phone: selectedEmp.phone }; } else if (editingJob && form.company_name !== editingJob.company_name) { payload.clear_employer_link = true; } const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (res.ok) { setShowForm(false); loadAll(); } else { const d = await res.json(); alert(d.error || 'Failed'); } setSaving(false); }
   async function deleteJob(id: string) { if (!confirm('Delete this job permanently?')) return; await fetch(`/api/jobs/${id}`, { method: 'DELETE' }); loadAll(); }
   async function toggleStatus(id: string, current: string) { await fetch(`/api/jobs/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: current === 'published' ? 'draft' : 'published' }) }); loadAll(); }
 
