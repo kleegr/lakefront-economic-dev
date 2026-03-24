@@ -1,15 +1,16 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown, Upload, FileText } from 'lucide-react';
+import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown, Upload, FileText, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllFields, GROUP_LABELS, type EmployeeFieldConfig } from '@/lib/ghl/employee-fields';
 import { EMPLOYER_FIELDS, EMPLOYER_GROUP_LABELS, type EmployerFieldConfig } from '@/lib/ghl/employer-fields';
 
 const STATUSES = ['submitted','reviewing','interview','offered','hired','rejected','withdrawn'];
 const APP_TYPES = ['employee','employer','provider','space_rental'];
-const STATUS_COLORS: Record<string,string> = {submitted:'bg-blue-50 text-blue-700',reviewing:'bg-yellow-50 text-yellow-700',interview:'bg-purple-50 text-purple-700',offered:'bg-emerald-50 text-emerald-700',hired:'bg-green-50 text-green-700',rejected:'bg-red-50 text-red-700',withdrawn:'bg-gray-100 text-gray-600'};
-const TYPE_COLORS: Record<string,string> = {employee:'bg-blue-50 text-blue-600',employer:'bg-green-50 text-green-600',provider:'bg-purple-50 text-purple-600',space_rental:'bg-amber-50 text-amber-600'};
+const SC: Record<string,string> = {submitted:'bg-blue-50 text-blue-700',reviewing:'bg-yellow-50 text-yellow-700',interview:'bg-purple-50 text-purple-700',offered:'bg-emerald-50 text-emerald-700',hired:'bg-green-50 text-green-700',rejected:'bg-red-50 text-red-700',withdrawn:'bg-gray-100 text-gray-600'};
+const TC: Record<string,string> = {employee:'bg-blue-50 text-blue-600',employer:'bg-green-50 text-green-600',provider:'bg-purple-50 text-purple-600',space_rental:'bg-amber-50 text-amber-600'};
 function fmt(s: string) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+const FL_COUNTIES = ['Alachua','Baker','Bay','Bradford','Brevard','Broward','Calhoun','Charlotte','Citrus','Clay','Collier','Columbia','DeSoto','Dixie','Duval','Escambia','Flagler','Franklin','Gadsden','Gilchrist','Glades','Gulf','Hamilton','Hardee','Hendry','Hernando','Highlands','Hillsborough','Holmes','Indian River','Jackson','Jefferson','Lafayette','Lake','Lee','Leon','Levy','Liberty','Madison','Manatee','Marion','Martin','Miami-Dade','Monroe','Nassau','Okaloosa','Okeechobee','Orange','Osceola','Palm Beach','Pasco','Pinellas','Polk','Putnam','Santa Rosa','Sarasota','Seminole','St. Johns','St. Lucie','Sumter','Suwannee','Taylor','Union','Volusia','Wakulla','Walton','Washington'];
 
 type AnyField = EmployeeFieldConfig | EmployerFieldConfig;
 const employeeFields = getAllFields();
@@ -17,7 +18,7 @@ const employeeGroups: Record<string, AnyField[]> = {};
 for (const f of employeeFields) { if (!employeeGroups[f.group]) employeeGroups[f.group] = []; employeeGroups[f.group].push(f); }
 const employerGroups: Record<string, AnyField[]> = {};
 for (const f of EMPLOYER_FIELDS) { if (!employerGroups[f.group]) employerGroups[f.group] = []; employerGroups[f.group].push(f); }
-const ALL_GROUP_LABELS: Record<string, string> = { ...GROUP_LABELS, ...EMPLOYER_GROUP_LABELS };
+const ALL_GL: Record<string, string> = { ...GROUP_LABELS, ...EMPLOYER_GROUP_LABELS };
 
 function getFieldsForType(type: string): { groups: Record<string, AnyField[]>; allFields: AnyField[] } {
   if (type === 'employer') return { groups: employerGroups, allFields: EMPLOYER_FIELDS };
@@ -34,57 +35,29 @@ export default function PortalApplicationsPage() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [showAdd, setShowAdd] = useState(false);
-  const [newForm, setNewForm] = useState<Record<string, any>>({ applicant_name: '', applicant_email: '', applicant_phone: '', address: '', application_type: 'employee', cover_letter: '', status: 'submitted', notes: '' });
+  const [newForm, setNewForm] = useState<Record<string, any>>({ applicant_name: '', applicant_email: '', applicant_phone: '', address: '', county: '', application_type: 'employee', cover_letter: '', status: 'submitted', notes: '' });
   const [saving, setSaving] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, experience: false, application: true, admin: true, business: true, employment: true });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, experience: true, application: true, admin: true, business: true, employment: true });
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, []);
   async function load() { const res = await fetch('/api/applications?admin=true'); const data = await res.json(); setApps(data.applications || []); setLoading(false); }
-
-  const filtered = apps.filter(a => {
-    if (search) { const q = search.toLowerCase(); if (!(a.applicant_name || '').toLowerCase().includes(q) && !(a.applicant_email || '').toLowerCase().includes(q)) return false; }
-    if (statusFilter && a.status !== statusFilter) return false;
-    if (typeFilter && a.application_type !== typeFilter) return false;
-    return true;
-  });
+  const filtered = apps.filter(a => { if (search) { const q = search.toLowerCase(); if (!(a.applicant_name || '').toLowerCase().includes(q) && !(a.applicant_email || '').toLowerCase().includes(q)) return false; } if (statusFilter && a.status !== statusFilter) return false; if (typeFilter && a.application_type !== typeFilter) return false; return true; });
   const selected = selectedId ? apps.find(a => a.id === selectedId) : null;
 
-  function startEdit() {
-    if (!selected) return;
-    const { allFields } = getFieldsForType(selected.application_type);
-    const form: Record<string, any> = { status: selected.status, notes: selected.notes || '', address: selected.address || '' };
-    for (const f of allFields) form[f.key] = selected[f.key] ?? '';
-    setEditForm(form); setEditing(true);
-  }
-
+  function startEdit() { if (!selected) return; const { allFields } = getFieldsForType(selected.application_type); const form: Record<string, any> = { status: selected.status, notes: selected.notes || '', address: selected.address || '', county: selected.county || '' }; for (const f of allFields) form[f.key] = selected[f.key] ?? ''; setEditForm(form); setEditing(true); }
   async function saveEdit() { if (!selected) return; setSaving(true); await fetch(`/api/applications/${selected.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm) }); setEditing(false); setSaving(false); load(); }
   async function deleteApp(id: string) { if (!confirm('Delete this application?')) return; await fetch(`/api/applications/${id}`, { method: 'DELETE' }); setSelectedId(null); load(); }
-  async function addApp(e: React.FormEvent) { e.preventDefault(); setSaving(true); const p: Record<string, any> = { ...newForm }; for (const k of Object.keys(p)) { if (p[k] === '' || p[k] === null) delete p[k]; } await fetch('/api/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); setShowAdd(false); setSaving(false); setNewForm({ applicant_name: '', applicant_email: '', applicant_phone: '', address: '', application_type: 'employee', cover_letter: '', status: 'submitted', notes: '' }); load(); }
-
+  async function addApp(e: React.FormEvent) { e.preventDefault(); setSaving(true); const p: Record<string, any> = { ...newForm }; for (const k of Object.keys(p)) { if (p[k] === '' || p[k] === null || p[k] === undefined) delete p[k]; } await fetch('/api/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); setShowAdd(false); setSaving(false); setNewForm({ applicant_name: '', applicant_email: '', applicant_phone: '', address: '', county: '', application_type: 'employee', cover_letter: '', status: 'submitted', notes: '' }); load(); }
   const toggleGroup = (g: string) => setExpandedGroups(prev => ({ ...prev, [g]: !prev[g] }));
 
-  async function handleFileUpload(file: File, formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
-    setUploading(true);
-    const fd = new FormData(); fd.append('file', file);
-    try { const res = await fetch('/api/upload', { method: 'POST', body: fd }); const data = await res.json(); if (data.url) setFormState({ ...formState, resume_url: data.url }); else alert(data.error || 'Upload failed'); } catch { alert('Upload failed'); }
-    setUploading(false);
-  }
+  async function handleFileUpload(file: File, fs: Record<string, any>, setFs: (v: Record<string, any>) => void) { setUploading(true); const fd = new FormData(); fd.append('file', file); try { const res = await fetch('/api/upload', { method: 'POST', body: fd }); const data = await res.json(); if (data.url) setFs({ ...fs, resume_url: data.url }); else alert(data.error || 'Upload failed'); } catch { alert('Upload failed'); } setUploading(false); }
 
-  function renderField(field: AnyField, formState: Record<string, any>, setFormState: (v: Record<string, any>) => void) {
-    const val = formState[field.key]; const set = (v: any) => setFormState({ ...formState, [field.key]: v });
+  function renderField(field: AnyField, fs: Record<string, any>, setFs: (v: Record<string, any>) => void) {
+    const val = fs[field.key]; const set = (v: any) => setFs({ ...fs, [field.key]: v });
     const cls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage';
-    if (field.type === 'file') {
-      return (<div>
-        {val && <a href={val} target="_blank" rel="noopener noreferrer" className="text-xs font-body text-blue-600 underline mb-1 block flex items-center gap-1"><FileText className="w-3 h-3" />View uploaded file</a>}
-        <label className={cn('flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-sage transition-colors', uploading && 'opacity-50 pointer-events-none')}>
-          <Upload className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-body text-gray-500">{uploading ? 'Uploading...' : val ? 'Replace file' : 'Upload resume (PDF, DOC)'}</span>
-          <input type="file" className="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, formState, setFormState); }} />
-        </label>
-      </div>);
-    }
+    if (field.type === 'currency') return (<div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span><input type="number" step="0.01" min="0" value={val || ''} onChange={e => set(e.target.value ? parseFloat(e.target.value) : '')} className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" placeholder={field.placeholder || '0.00'} /></div>);
+    if (field.type === 'file') return (<div>{val && <a href={val} target="_blank" rel="noopener noreferrer" className="text-xs font-body text-blue-600 underline mb-1 flex items-center gap-1"><FileText className="w-3 h-3" />View uploaded file</a>}<label className={cn('flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-sage transition-colors', uploading && 'opacity-50 pointer-events-none')}><Upload className="w-4 h-4 text-gray-400" /><span className="text-sm font-body text-gray-500">{uploading ? 'Uploading...' : val ? 'Replace file' : 'Upload resume (PDF, DOC)'}</span><input type="file" className="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, fs, setFs); }} /></label></div>);
     if (field.type === 'select') return <select value={val || ''} onChange={e => set(e.target.value)} className={cls}><option value="">Select...</option>{(field.options || []).map(o => <option key={o} value={o}>{o}</option>)}</select>;
     if (field.type === 'multiselect') return <div className="flex flex-wrap gap-1 border border-gray-200 rounded-lg p-2 max-h-24 overflow-y-auto">{(field.options || []).map(o => <button key={o} type="button" onClick={() => { const cur = val || []; set(cur.includes(o) ? cur.filter((x: string) => x !== o) : [...cur, o]); }} className={`px-2 py-0.5 rounded-full text-[10px] font-body transition-colors ${(val || []).includes?.(o) ? 'bg-brand-forest text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{o}</button>)}</div>;
     if (field.type === 'textarea') return <textarea rows={2} value={val || ''} onChange={e => set(e.target.value)} className={cn(cls, 'resize-none')} placeholder={field.placeholder} />;
@@ -93,17 +66,9 @@ export default function PortalApplicationsPage() {
     return <input type="text" value={val || ''} onChange={e => set(e.target.value)} className={cls} placeholder={field.placeholder} />;
   }
 
-  function renderFieldGroups(formState: Record<string, any>, setFormState: (v: Record<string, any>) => void, type: string) {
+  function renderFieldGroups(fs: Record<string, any>, setFs: (v: Record<string, any>) => void, type: string) {
     const { groups } = getFieldsForType(type);
-    return Object.entries(groups).map(([gk, fields]) => (
-      <div key={gk} className="border-t pt-3">
-        <button type="button" onClick={() => toggleGroup(gk)} className="flex items-center justify-between w-full mb-2">
-          <p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-400">{ALL_GROUP_LABELS[gk] || gk}</p>
-          <ChevronDown className={`w-3.5 h-3.5 text-gray-300 transition-transform ${expandedGroups[gk] ? 'rotate-180' : ''}`} />
-        </button>
-        {expandedGroups[gk] && <div className="grid sm:grid-cols-2 gap-3">{fields.map(f => <div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">{f.label}</label>{renderField(f, formState, setFormState)}</div>)}</div>}
-      </div>
-    ));
+    return Object.entries(groups).map(([gk, fields]) => (<div key={gk} className="border-t pt-3"><button type="button" onClick={() => toggleGroup(gk)} className="flex items-center justify-between w-full mb-2"><p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-400">{ALL_GL[gk] || gk}</p><ChevronDown className={`w-3.5 h-3.5 text-gray-300 transition-transform ${expandedGroups[gk] ? 'rotate-180' : ''}`} /></button>{expandedGroups[gk] && <div className="grid sm:grid-cols-2 gap-3">{fields.map(f => <div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">{f.label}</label>{renderField(f, fs, setFs)}</div>)}</div>}</div>));
   }
 
   function renderViewFields(app: any) {
@@ -111,14 +76,7 @@ export default function PortalApplicationsPage() {
     return Object.entries(groups).map(([gk, fields]) => {
       const populated = fields.filter(f => { const v = app[f.key]; return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0); });
       if (populated.length === 0) return null;
-      return (<div key={gk}><p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-300 mb-2">{ALL_GROUP_LABELS[gk] || gk}</p><div className="grid sm:grid-cols-2 gap-2">{populated.map(f => (<div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}>
-        <p className="text-[10px] font-body text-gray-400">{f.label}</p>
-        {f.type === 'file' && app[f.key] ? (
-          <a href={app[f.key]} target="_blank" rel="noopener noreferrer" className="text-sm font-body text-blue-600 underline flex items-center gap-1"><FileText className="w-3.5 h-3.5" />View Resume</a>
-        ) : (
-          <p className="text-sm font-body text-brand-forest">{Array.isArray(app[f.key]) ? app[f.key].join(', ') : String(app[f.key])}</p>
-        )}
-      </div>))}</div></div>);
+      return (<div key={gk}><p className="text-[10px] font-body font-semibold uppercase tracking-wider text-gray-300 mb-2">{ALL_GL[gk] || gk}</p><div className="grid sm:grid-cols-2 gap-2">{populated.map(f => (<div key={f.key} className={f.colSpan === 2 ? 'sm:col-span-2' : ''}><p className="text-[10px] font-body text-gray-400">{f.label}</p>{f.type === 'file' && app[f.key] ? (<a href={app[f.key]} target="_blank" rel="noopener noreferrer" className="text-sm font-body text-blue-600 underline flex items-center gap-1"><FileText className="w-3.5 h-3.5" />View Resume</a>) : f.type === 'currency' ? (<p className="text-sm font-body text-brand-forest">${Number(app[f.key]).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>) : (<p className="text-sm font-body text-brand-forest">{Array.isArray(app[f.key]) ? app[f.key].join(', ') : String(app[f.key])}</p>)}</div>))}</div></div>);
     });
   }
 
@@ -126,76 +84,30 @@ export default function PortalApplicationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between"><div><h1 className="font-display text-2xl font-bold text-brand-forest">Applications</h1><p className="text-sm font-body text-gray-400 mt-1">{apps.length} total</p></div>
-        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Application</button>
-      </div>
-      <div className="flex gap-3 flex-wrap"><div className="flex-1 relative min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div>
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Types</option>{APP_TYPES.map(t => <option key={t} value={t}>{fmt(t)}</option>)}</select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Status</option>{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select>
-      </div>
+      <div className="flex items-center justify-between"><div><h1 className="font-display text-2xl font-bold text-brand-forest">Applications</h1><p className="text-sm font-body text-gray-400 mt-1">{apps.length} total</p></div><button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Application</button></div>
+      <div className="flex gap-3 flex-wrap"><div className="flex-1 relative min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div><select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Types</option>{APP_TYPES.map(t => <option key={t} value={t}>{fmt(t)}</option>)}</select><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Status</option>{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl border overflow-hidden max-h-[80vh] overflow-y-auto"><div className="divide-y divide-gray-50">{filtered.map(app => (
-          <button key={app.id} onClick={() => { setSelectedId(app.id); setEditing(false); }} className={cn('w-full text-left px-5 py-4 hover:bg-gray-50/50 transition-colors flex items-center justify-between', selectedId === app.id && 'bg-gray-50 border-l-2 border-brand-sage')}>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1"><p className="text-sm font-body font-medium text-brand-forest truncate">{app.applicant_name || 'Unknown'}</p><span className={`px-2 py-0.5 text-[9px] font-body font-semibold rounded-full ${TYPE_COLORS[app.application_type] || 'bg-gray-100 text-gray-500'}`}>{fmt(app.application_type || 'employee')}</span><span className={`px-2 py-0.5 text-[10px] font-body font-semibold rounded-full ${STATUS_COLORS[app.status] || 'bg-gray-100 text-gray-500'}`}>{app.status}</span></div>
-              <p className="text-xs font-body text-gray-400 truncate">{app.applicant_email || '-'}</p>
-              {app.job?.title && <p className="text-[10px] font-body text-gray-300 mt-0.5 flex items-center gap-1"><Briefcase className="w-3 h-3" />{app.job.title}</p>}
-            </div><ChevronRight className="w-4 h-4 text-gray-200 shrink-0" />
-          </button>
-        ))}{filtered.length === 0 && <div className="text-center py-12"><p className="text-sm font-body text-gray-400">No applications found.</p></div>}</div></div>
+        <div className="lg:col-span-2 bg-white rounded-xl border overflow-hidden max-h-[80vh] overflow-y-auto"><div className="divide-y divide-gray-50">{filtered.map(app => (<button key={app.id} onClick={() => { setSelectedId(app.id); setEditing(false); }} className={cn('w-full text-left px-5 py-4 hover:bg-gray-50/50 transition-colors flex items-center justify-between', selectedId === app.id && 'bg-gray-50 border-l-2 border-brand-sage')}><div className="min-w-0 flex-1"><div className="flex items-center gap-2 mb-1"><p className="text-sm font-body font-medium text-brand-forest truncate">{app.applicant_name || 'Unknown'}</p><span className={`px-2 py-0.5 text-[9px] font-body font-semibold rounded-full ${TC[app.application_type] || 'bg-gray-100 text-gray-500'}`}>{fmt(app.application_type || 'employee')}</span><span className={`px-2 py-0.5 text-[10px] font-body font-semibold rounded-full ${SC[app.status] || 'bg-gray-100 text-gray-500'}`}>{app.status}</span></div><p className="text-xs font-body text-gray-400 truncate">{app.applicant_email || '-'}</p>{app.job?.title && <p className="text-[10px] font-body text-gray-300 mt-0.5 flex items-center gap-1"><Briefcase className="w-3 h-3" />{app.job.title}</p>}</div><ChevronRight className="w-4 h-4 text-gray-200 shrink-0" /></button>))}{filtered.length === 0 && <div className="text-center py-12"><p className="text-sm font-body text-gray-400">No applications found.</p></div>}</div></div>
 
-        <div className="lg:col-span-3">{selected ? (
-          <div className="bg-white rounded-xl border p-5 space-y-4 sticky top-20 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold text-brand-forest">{selected.applicant_name || 'Unknown'}</h2>
-              <div className="flex items-center gap-1">
-                <button onClick={startEdit} className={`p-1.5 rounded-lg ${editing ? 'text-brand-forest bg-brand-sage/20' : 'text-gray-300 hover:text-brand-forest hover:bg-gray-100'}`}><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => deleteApp(selected.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-              </div>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${TYPE_COLORS[selected.application_type] || ''}`}>{fmt(selected.application_type || 'employee')}</span>
-              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${STATUS_COLORS[selected.status] || ''}`}>{selected.status}</span>
-              {selected.ghl_contact_id && <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-50 text-green-600">Synced to Kleegr</span>}
-              {selected.job?.title && <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-50 text-purple-600">{selected.job.title}</span>}
-            </div>
-            <div className="space-y-2 text-sm font-body">
-              <p className="flex items-center gap-2 text-gray-500"><Mail className="w-4 h-4 text-brand-sage" />{selected.applicant_email || '-'}</p>
-              <p className="flex items-center gap-2 text-gray-500"><Phone className="w-4 h-4 text-brand-sage" />{selected.applicant_phone || '-'}</p>
-              {selected.address && <p className="flex items-center gap-2 text-gray-500"><MapPin className="w-4 h-4 text-brand-sage" />{selected.address}</p>}
-              <p className="flex items-center gap-2 text-gray-500"><Clock className="w-4 h-4 text-brand-sage" />{selected.created_at ? new Date(selected.created_at).toLocaleString() : '-'}</p>
-            </div>
-
-            {editing ? (
-              <div className="space-y-3 pt-2 border-t">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Status</label><select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body">{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div>
-                  <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={editForm.address || ''} onChange={e => setEditForm({...editForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
-                </div>
-                {renderFieldGroups(editForm, setEditForm, selected.application_type)}
-                <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Admin Notes</label><textarea rows={2} value={editForm.notes || ''} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body resize-none" /></div>
-                <div className="flex gap-2"><button onClick={saveEdit} disabled={saving} className="px-4 py-2 bg-brand-forest text-white rounded-lg text-sm font-semibold disabled:opacity-50">{saving ? 'Saving & Syncing...' : 'Save & Sync to Kleegr'}</button><button onClick={() => setEditing(false)} className="px-4 py-2 border border-gray-200 text-gray-500 rounded-lg text-sm">Cancel</button></div>
-              </div>
-            ) : (
-              <div className="space-y-3 pt-2 border-t">
-                {renderViewFields(selected)}
-                {selected.notes && <div><p className="text-[10px] font-body text-gray-400">Admin Notes</p><p className="text-sm font-body text-gray-600 whitespace-pre-wrap">{selected.notes}</p></div>}
-                {selected.ghl_synced_at && <p className="text-[10px] font-body text-gray-300">Last synced: {new Date(selected.ghl_synced_at).toLocaleString()}</p>}
-              </div>
-            )}
-          </div>
-        ) : <div className="bg-white rounded-xl border p-8 text-center"><p className="text-sm font-body text-gray-400">Select an application to view details</p></div>}</div>
+        <div className="lg:col-span-3">{selected ? (<div className="bg-white rounded-xl border p-5 space-y-4 sticky top-20 max-h-[85vh] overflow-y-auto">
+          <div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold text-brand-forest">{selected.applicant_name || 'Unknown'}</h2><div className="flex items-center gap-1"><button onClick={startEdit} className={`p-1.5 rounded-lg ${editing ? 'text-brand-forest bg-brand-sage/20' : 'text-gray-300 hover:text-brand-forest hover:bg-gray-100'}`}><Pencil className="w-4 h-4" /></button><button onClick={() => deleteApp(selected.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button></div></div>
+          <div className="flex gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${TC[selected.application_type] || ''}`}>{fmt(selected.application_type || 'employee')}</span><span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${SC[selected.status] || ''}`}>{selected.status}</span>{selected.ghl_contact_id && <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-50 text-green-600">Synced to Kleegr</span>}{selected.job?.title && <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-50 text-purple-600">{selected.job.title}</span>}</div>
+          <div className="space-y-2 text-sm font-body"><p className="flex items-center gap-2 text-gray-500"><Mail className="w-4 h-4 text-brand-sage" />{selected.applicant_email || '-'}</p><p className="flex items-center gap-2 text-gray-500"><Phone className="w-4 h-4 text-brand-sage" />{selected.applicant_phone || '-'}</p>{selected.address && <p className="flex items-center gap-2 text-gray-500"><MapPin className="w-4 h-4 text-brand-sage" />{selected.address}</p>}{selected.county && <p className="flex items-center gap-2 text-gray-500"><MapPin className="w-4 h-4 text-brand-sage" />{selected.county} County</p>}<p className="flex items-center gap-2 text-gray-500"><Clock className="w-4 h-4 text-brand-sage" />{selected.created_at ? new Date(selected.created_at).toLocaleString() : '-'}</p></div>
+          {editing ? (<div className="space-y-3 pt-2 border-t"><div className="grid sm:grid-cols-2 gap-3"><div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Status</label><select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body">{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div><div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">County</label><select value={editForm.county || ''} onChange={e => setEditForm({...editForm, county: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body"><option value="">Select county...</option>{FL_COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div><div className="sm:col-span-2"><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={editForm.address || ''} onChange={e => setEditForm({...editForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div></div>{renderFieldGroups(editForm, setEditForm, selected.application_type)}<div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Admin Notes</label><textarea rows={2} value={editForm.notes || ''} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body resize-none" /></div><div className="flex gap-2"><button onClick={saveEdit} disabled={saving} className="px-4 py-2 bg-brand-forest text-white rounded-lg text-sm font-semibold disabled:opacity-50">{saving ? 'Saving & Syncing...' : 'Save & Sync to Kleegr'}</button><button onClick={() => setEditing(false)} className="px-4 py-2 border border-gray-200 text-gray-500 rounded-lg text-sm">Cancel</button></div></div>
+          ) : (<div className="space-y-3 pt-2 border-t">{renderViewFields(selected)}{selected.notes && <div><p className="text-[10px] font-body text-gray-400">Admin Notes</p><p className="text-sm font-body text-gray-600 whitespace-pre-wrap">{selected.notes}</p></div>}{selected.ghl_synced_at && <p className="text-[10px] font-body text-gray-300">Last synced: {new Date(selected.ghl_synced_at).toLocaleString()}</p>}</div>)}
+        </div>) : <div className="bg-white rounded-xl border p-8 text-center"><p className="text-sm font-body text-gray-400">Select an application to view details</p></div>}</div>
       </div>
 
-      {showAdd && <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 bg-black/50 backdrop-blur-sm" onClick={() => setShowAdd(false)}><div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}><div className="border-b p-4 flex items-center justify-between sticky top-0 bg-white z-10"><h2 className="font-display text-lg font-semibold text-brand-forest">Add Application</h2><button onClick={() => setShowAdd(false)} className="p-1 text-gray-400"><X className="w-5 h-5" /></button></div><form onSubmit={addApp} className="p-5 space-y-4">
+      {showAdd && <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 bg-black/50 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="border-b p-4 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-xl"><h2 className="font-display text-lg font-semibold text-brand-forest">Add Application</h2><button onClick={() => setShowAdd(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button></div><form onSubmit={addApp} className="p-5 space-y-4">
         <div className="grid sm:grid-cols-2 gap-3">
           <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Type *</label><select value={newForm.application_type} onChange={e => setNewForm({...newForm, application_type: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body">{APP_TYPES.map(t => <option key={t} value={t}>{fmt(t)}</option>)}</select></div>
           <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Status</label><select value={newForm.status} onChange={e => setNewForm({...newForm, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body">{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div>
           <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Name *</label><input required value={newForm.applicant_name} onChange={e => setNewForm({...newForm, applicant_name: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
-          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Email</label><input value={newForm.applicant_email || ''} onChange={e => setNewForm({...newForm, applicant_email: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
-          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Phone</label><input value={newForm.applicant_phone || ''} onChange={e => setNewForm({...newForm, applicant_phone: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
-          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={newForm.address || ''} onChange={e => setNewForm({...newForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
+          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Email</label><input type="email" value={newForm.applicant_email || ''} onChange={e => setNewForm({...newForm, applicant_email: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" /></div>
+          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Phone</label><input type="tel" value={newForm.applicant_phone || ''} onChange={e => setNewForm({...newForm, applicant_phone: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" placeholder="+1 (555) 123-4567" /></div>
+          <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">County</label><select value={newForm.county || ''} onChange={e => setNewForm({...newForm, county: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body"><option value="">Select county...</option>{FL_COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div className="sm:col-span-2"><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Address</label><input value={newForm.address || ''} onChange={e => setNewForm({...newForm, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body" placeholder="Full address" /></div>
         </div>
         {renderFieldGroups(newForm, setNewForm, newForm.application_type)}
         <div><label className="block text-[10px] font-body text-gray-400 uppercase mb-1">Admin Notes</label><textarea rows={2} value={newForm.notes || ''} onChange={e => setNewForm({...newForm, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-body resize-none" /></div>
