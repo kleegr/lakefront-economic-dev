@@ -9,11 +9,17 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   const entityType = searchParams.get('entity_type');
   const direction = searchParams.get('direction');
+  const dateFrom = searchParams.get('date_from');
+  const dateTo = searchParams.get('date_to');
+  const sortBy = searchParams.get('sort_by') || 'created_at';
+  const sortOrder = searchParams.get('sort_order') === 'asc' ? true : false;
 
-  let query = supabase.from('lf_sync_log').select('*').order('created_at', { ascending: false }).limit(limit);
+  let query = supabase.from('lf_sync_log').select('*').order(sortBy, { ascending: sortOrder }).limit(limit);
   if (status) query = query.eq('status', status);
   if (entityType) query = query.eq('entity_type', entityType);
   if (direction) query = query.eq('direction', direction);
+  if (dateFrom) query = query.gte('created_at', dateFrom);
+  if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59.999Z');
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
