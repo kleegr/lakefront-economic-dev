@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, ChevronDown, LogIn } from 'lucide-react';
+import { Menu, X, ChevronDown, LogIn, UserPlus } from 'lucide-react';
 
-// ITEMS 1,3,5,6: Login button, rename Jobs to Employer/Employee, remove Residential, separate About/Commercial
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
   { label: 'About', href: '/about' },
@@ -37,7 +36,6 @@ export function PublicHeader() {
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 glass-header ${scrolled ? 'scrolled' : ''}`}>
       <div className="max-container section-padding">
         <div className="flex items-center justify-between h-[80px]">
-          {/* Logo */}
           <Link href="/" className="flex items-center shrink-0 group">
             <div className="flex flex-col">
               <span className="transition-colors duration-300 group-hover:opacity-80" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '28px', fontWeight: 400, color: '#2C3E2D', lineHeight: 1.1, letterSpacing: '-0.5px' }}>Lakefront</span>
@@ -45,7 +43,6 @@ export function PublicHeader() {
             </div>
           </Link>
 
-          {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-1">
             <nav className="flex items-center gap-0">
               {NAV_ITEMS.map((item) => (
@@ -66,22 +63,21 @@ export function PublicHeader() {
               ))}
             </nav>
 
-            {/* ITEM 1: Login button */}
             <Link href="/auth/login" className="ml-2 px-4 py-2 text-[12px] font-body font-semibold tracking-[0.1em] uppercase rounded-full transition-all duration-300 border border-[#2C3E2D]/20 text-[#2C3E2D] hover:bg-[#2C3E2D]/5 flex items-center gap-1.5">
               <LogIn className="w-3.5 h-3.5" /> Login
             </Link>
 
-            <Link href="/apply" className="ml-2 px-6 py-2.5 text-[12px] font-body font-semibold tracking-[0.15em] uppercase rounded-full transition-all duration-300 btn-magnetic" style={{ backgroundColor: '#2C3E2D', color: '#FFFFFF' }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#C9B97A'; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#2C3E2D'; }}>Application</Link>
+            <Link href="/auth/signup" className="ml-2 px-5 py-2.5 text-[12px] font-body font-semibold tracking-[0.15em] uppercase rounded-full transition-all duration-300 btn-magnetic flex items-center gap-1.5" style={{ backgroundColor: '#2C3E2D', color: '#FFFFFF' }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#C9B97A'; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#2C3E2D'; }}>
+              <UserPlus className="w-3.5 h-3.5" /> Sign Up
+            </Link>
           </div>
 
-          {/* Mobile toggle */}
           <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 text-[#2C3E2D]" aria-label="Toggle navigation">
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
         <div className="lg:hidden bg-white/95 backdrop-blur-xl border-t border-gray-100/50 shadow-xl animate-fade-in">
           <nav className="section-padding py-6 space-y-1">
@@ -93,7 +89,7 @@ export function PublicHeader() {
             ))}
             <div className="pt-4 space-y-2">
               <Link href="/auth/login" className="block w-full text-center py-3 rounded-full text-sm font-body font-semibold uppercase tracking-wider border border-[#2C3E2D]/20 text-[#2C3E2D]" onClick={() => setMobileOpen(false)}>Login</Link>
-              <Link href="/apply" className="block w-full text-center py-3 rounded-full text-sm font-body font-semibold uppercase tracking-wider text-white" style={{ backgroundColor: '#2C3E2D' }} onClick={() => setMobileOpen(false)}>Application</Link>
+              <Link href="/auth/signup" className="block w-full text-center py-3 rounded-full text-sm font-body font-semibold uppercase tracking-wider text-white" style={{ backgroundColor: '#2C3E2D' }} onClick={() => setMobileOpen(false)}>Sign Up</Link>
             </div>
           </nav>
         </div>
