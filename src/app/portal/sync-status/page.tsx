@@ -40,7 +40,7 @@ export default function SyncStatusPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-brand-forest">Kleegr Sync Status</h1>
-          <p className="text-sm font-body text-gray-400 mt-1">Real-time view of all GHL/Kleegr sync operations - every move logged</p>
+          <p className="text-sm font-body text-gray-400 mt-1">Real-time view of all Kleegr sync operations - every move logged</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-xs font-body text-gray-500 cursor-pointer"><input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} className="rounded border-gray-300" />Auto-refresh</label>
@@ -52,8 +52,8 @@ export default function SyncStatusPage() {
         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-brand-forest">{stats?.last_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Last 24h</p></div>
         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-green-600">{stats?.success_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Success</p></div>
         <div className={`bg-white rounded-xl border p-4 text-center ${errorCount > 0 ? 'border-red-200' : ''}`}><div className={`text-2xl font-display font-bold ${errorCount > 0 ? 'text-red-600' : 'text-gray-300'}`}>{errorCount}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Errors</p></div>
-        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-blue-600">{stats?.outbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'Portal -> GHL'}</p></div>
-        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-amber-600">{stats?.inbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'GHL -> Portal'}</p></div>
+        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-blue-600">{stats?.outbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'Portal -> Kleegr'}</p></div>
+        <div className="bg-white rounded-xl border p-4 text-center"><div className="text-2xl font-display font-bold text-amber-600">{stats?.inbound_24h || 0}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">{'Kleegr -> Portal'}</p></div>
         <div className="bg-white rounded-xl border p-4 text-center"><div className="text-xs font-body font-semibold text-brand-forest mt-1">{stats?.last_sync ? new Date(stats.last_sync).toLocaleTimeString() : '-'}</div><p className="text-[10px] text-gray-400 uppercase font-body font-semibold">Last Sync</p></div>
       </div>
 
@@ -71,7 +71,7 @@ export default function SyncStatusPage() {
       <div className="flex gap-2 flex-wrap">
         <select value={filter.status} onChange={e => setFilter(f => ({...f, status: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Status</option><option value="success">Success</option><option value="error">Errors</option><option value="skipped">Skipped</option></select>
         <select value={filter.entity_type} onChange={e => setFilter(f => ({...f, entity_type: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Types</option><option value="application">Employee/Application</option><option value="job">Job</option><option value="employer">Employer</option><option value="webhook_inbound">Webhook Inbound</option></select>
-        <select value={filter.direction} onChange={e => setFilter(f => ({...f, direction: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">{'Portal -> GHL'}</option><option value="inbound">{'GHL -> Portal'}</option></select>
+        <select value={filter.direction} onChange={e => setFilter(f => ({...f, direction: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-xs font-body"><option value="">All Directions</option><option value="outbound">{'Portal -> Kleegr'}</option><option value="inbound">{'Kleegr -> Portal'}</option></select>
         {(filter.status || filter.entity_type || filter.direction) && (<button onClick={() => setFilter({ status: '', entity_type: '', direction: '' })} className="text-xs text-brand-forest font-body underline">Clear filters</button>)}
       </div>
 
@@ -80,7 +80,7 @@ export default function SyncStatusPage() {
           <div className="p-12 text-center"><RefreshCw className="w-8 h-8 text-gray-200 mx-auto mb-3" /><p className="text-sm font-body text-gray-400">No sync events yet. Events will appear here as they happen.</p></div>
         ) : (
           <table className="w-full text-sm font-body">
-            <thead><tr className="text-left text-xs text-gray-400 uppercase tracking-wider border-b bg-gray-50"><th className="p-3">Direction</th><th className="p-3">Type</th><th className="p-3">Action</th><th className="p-3">Status</th><th className="p-3">Details</th><th className="p-3">GHL ID</th><th className="p-3">Time</th></tr></thead>
+            <thead><tr className="text-left text-xs text-gray-400 uppercase tracking-wider border-b bg-gray-50"><th className="p-3">Direction</th><th className="p-3">Type</th><th className="p-3">Action</th><th className="p-3">Status</th><th className="p-3">Details</th><th className="p-3">Kleegr ID</th><th className="p-3">Time</th></tr></thead>
             <tbody>
               {logs.map(log => {
                 const DirIcon = DIRECTION_ICONS[log.direction] || ArrowUpRight;
