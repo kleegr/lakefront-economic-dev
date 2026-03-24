@@ -1,59 +1,43 @@
 'use client';
-import { Save, Globe, Key, Bell, Database, Shield } from 'lucide-react';
+import { useState } from 'react';
+import Link from 'next/link';
+import { Users, Tag, Key, Plug, Eye, ScrollText, Settings, ChevronRight, Sliders } from 'lucide-react';
 
-export default function PortalSettingsPage() {
+// ITEM 15: Settings is now a full page with cards for each sub-section
+// ITEM 14: Job Fields Configuration is here
+// ITEM 16/17: Renamed GHL to Kleegr Integration
+const SETTINGS_SECTIONS = [
+  { label: 'Users & Access', description: 'Manage admin users, roles, and permissions', href: '/portal/users', icon: Users },
+  { label: 'Job Fields Configuration', description: 'Add/edit fields, dropdown options, GHL sync mapping', href: '/portal/settings/job-fields', icon: Sliders },
+  { label: 'Kleegr Integration', description: 'Configure API keys, verify connection, manage sync', href: '/portal/ghl-setup', icon: Plug },
+  { label: 'Skills', description: 'Manage skill tags for job matching', href: '/portal/skills', icon: Tag },
+  { label: 'AI Settings', description: 'Anthropic API key, resume builder config', href: '/portal/ai-settings', icon: Key },
+  { label: 'Impersonate', description: 'View portal as another user', href: '/portal/impersonate', icon: Eye },
+  { label: 'Audit Log', description: 'Track all admin actions and changes', href: '/portal/audit', icon: ScrollText },
+];
+
+export default function SettingsPage() {
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div><h1 className="text-2xl font-display font-bold text-brand-text">Settings</h1><p className="text-sm font-body text-brand-muted mt-1">Configure your Lakefront Economy portal.</p></div>
-
-      <div className="card-portal p-6 space-y-5">
-        <div className="flex items-center gap-3"><Database className="w-5 h-5 text-portal-accent" /><h2 className="text-base font-display font-semibold text-brand-text">Kleegr Integration</h2></div>
-        <p className="text-sm font-body text-brand-muted">Connect to your Kleegr CRM to sync contacts, companies, opportunities, and pipeline data.</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Kleegr API Key</label><input type="password" className="input-portal" placeholder="Enter your Kleegr API key" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Location ID</label><input type="text" className="input-portal" placeholder="Enter Kleegr location ID" /></div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Webhook Secret</label><input type="password" className="input-portal" placeholder="Webhook signing secret" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Webhook URL</label><div className="input-portal bg-gray-50 text-xs text-brand-muted truncate">/api/kleegr/webhook</div></div>
-        </div>
-        <button className="btn-portal"><Save className="w-4 h-4 mr-1.5" /> Save Kleegr Settings</button>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-brand-forest">Settings</h1>
+        <p className="text-sm font-body text-gray-400 mt-1">Configure your portal, integrations, and team</p>
       </div>
-
-      <div className="card-portal p-6 space-y-5">
-        <div className="flex items-center gap-3"><Key className="w-5 h-5 text-portal-accent" /><h2 className="text-base font-display font-semibold text-brand-text">Pipeline Configuration</h2></div>
-        <p className="text-sm font-body text-brand-muted">Map your Kleegr pipelines to Lakefront Economy modules.</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">ATS Pipeline ID</label><input type="text" className="input-portal" placeholder="Job applications pipeline" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Business Intake Pipeline ID</label><input type="text" className="input-portal" placeholder="Business applications pipeline" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Investor Pipeline ID</label><input type="text" className="input-portal" placeholder="Investor leads pipeline" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Provider Pipeline ID</label><input type="text" className="input-portal" placeholder="Service provider pipeline" /></div>
-        </div>
-        <button className="btn-portal"><Save className="w-4 h-4 mr-1.5" /> Save Pipeline Config</button>
-      </div>
-
-      <div className="card-portal p-6 space-y-5">
-        <div className="flex items-center gap-3"><Globe className="w-5 h-5 text-portal-accent" /><h2 className="text-base font-display font-semibold text-brand-text">Site Settings</h2></div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Site Name</label><input type="text" className="input-portal" defaultValue="Lakefront Economy" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Contact Email</label><input type="email" className="input-portal" defaultValue="info@lakefrontestatesfl.com" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Phone</label><input type="tel" className="input-portal" defaultValue="863.333.9400" /></div>
-          <div><label className="block text-xs font-body font-medium text-brand-muted mb-1.5 uppercase tracking-wider">Address</label><input type="text" className="input-portal" defaultValue="Okeechobee, FL 34974" /></div>
-        </div>
-        <button className="btn-portal"><Save className="w-4 h-4 mr-1.5" /> Save Site Settings</button>
-      </div>
-
-      <div className="card-portal p-6 space-y-5">
-        <div className="flex items-center gap-3"><Bell className="w-5 h-5 text-portal-accent" /><h2 className="text-base font-display font-semibold text-brand-text">Notifications</h2></div>
-        <div className="space-y-3">
-          {['New job application received','New business inquiry','New investor lead','New service provider application','Weekly summary report'].map(item => (
-            <div key={item} className="flex items-center justify-between py-2">
-              <span className="text-sm font-body text-brand-text/70">{item}</span>
-              <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" defaultChecked className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-portal-accent/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-portal-accent after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" /></label>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {SETTINGS_SECTIONS.map((s) => (
+          <Link key={s.href} href={s.href} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md hover:border-brand-sage/30 transition-all group">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-brand-sage/10 flex items-center justify-center shrink-0 group-hover:bg-brand-sage/20 transition-colors">
+                <s.icon className="w-5 h-5 text-brand-forest" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-display text-sm font-semibold text-brand-forest group-hover:text-brand-sage transition-colors">{s.label}</h3>
+                <p className="text-xs font-body text-gray-400 mt-1">{s.description}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-200 group-hover:text-brand-sage transition-colors shrink-0 mt-1" />
             </div>
-          ))}
-        </div>
-        <button className="btn-portal"><Save className="w-4 h-4 mr-1.5" /> Save Notifications</button>
+          </Link>
+        ))}
       </div>
     </div>
   );

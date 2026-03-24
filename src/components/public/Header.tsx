@@ -2,20 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown, LogIn } from 'lucide-react';
 
+// ITEMS 1,3,5,6: Login button, rename Jobs to Employer/Employee, remove Residential, separate About/Commercial
 const NAV_ITEMS = [
   { label: 'Home', href: '/' },
+  { label: 'About', href: '/about' },
+  { label: 'Commercial', href: '/commercial' },
   {
-    label: 'About',
-    href: '/about',
+    label: 'Employer / Employee',
+    href: '/jobs',
     children: [
-      { label: 'Residential', href: '/about' },
-      { label: 'Commercial', href: '/commercial' },
+      { label: 'Browse Jobs', href: '/jobs' },
+      { label: 'Post a Job (Employer)', href: '/jobs/employer-apply' },
     ],
   },
-  { label: 'Jobs', href: '/jobs' },
-  { label: 'Businesses', href: '/businesses' },
+  { label: 'Spaces', href: '/spaces' },
   { label: 'Services', href: '/services' },
   { label: 'Contact', href: '/contact' },
 ];
@@ -38,15 +40,8 @@ export function PublicHeader() {
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0 group">
             <div className="flex flex-col">
-              <span
-                className="transition-colors duration-300 group-hover:opacity-80"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '28px', fontWeight: 400, color: '#2C3E2D', lineHeight: 1.1, letterSpacing: '-0.5px' }}
-              >
-                Lakefront
-              </span>
-              <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: '9px', fontWeight: 600, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#9A8A5A', lineHeight: 1 }}>
-                Estates &amp; Villas
-              </span>
+              <span className="transition-colors duration-300 group-hover:opacity-80" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '28px', fontWeight: 400, color: '#2C3E2D', lineHeight: 1.1, letterSpacing: '-0.5px' }}>Lakefront</span>
+              <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: '9px', fontWeight: 600, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#9A8A5A', lineHeight: 1 }}>Estates &amp; Villas</span>
             </div>
           </Link>
 
@@ -54,30 +49,16 @@ export function PublicHeader() {
           <div className="hidden lg:flex items-center gap-1">
             <nav className="flex items-center gap-0">
               {NAV_ITEMS.map((item) => (
-                <div
-                  key={item.label}
-                  className="relative"
-                  onMouseEnter={() => item.children && setActiveDropdown(item.label)}
-                  onMouseLeave={() => setActiveDropdown(null)}
-                >
-                  <Link
-                    href={item.href}
-                    className="relative px-4 py-2 text-[14px] font-body font-medium flex items-center gap-1 text-[#4A5A4F] hover:text-[#2C3E2D] transition-colors duration-300 group"
-                  >
+                <div key={item.label} className="relative" onMouseEnter={() => item.children && setActiveDropdown(item.label)} onMouseLeave={() => setActiveDropdown(null)}>
+                  <Link href={item.href} className="relative px-4 py-2 text-[14px] font-body font-medium flex items-center gap-1 text-[#4A5A4F] hover:text-[#2C3E2D] transition-colors duration-300 group">
                     {item.label}
                     {item.children && <ChevronDown className="w-3 h-3 transition-transform duration-200 group-hover:rotate-180" />}
                     <span className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#C9B97A] scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                   </Link>
                   {item.children && activeDropdown === item.label && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white/95 backdrop-blur-xl rounded-lg shadow-xl border border-gray-100/50 py-2 animate-fade-in-scale opacity-0 stagger-1">
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-white/95 backdrop-blur-xl rounded-lg shadow-xl border border-gray-100/50 py-2 animate-fade-in-scale opacity-0 stagger-1">
                       {item.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className="block px-4 py-2.5 text-[13px] font-body text-[#4A5A4F] hover:text-[#2C3E2D] hover:bg-gray-50/80 hover:pl-5 transition-all duration-200"
-                        >
-                          {child.label}
-                        </Link>
+                        <Link key={child.href} href={child.href} className="block px-4 py-2.5 text-[13px] font-body text-[#4A5A4F] hover:text-[#2C3E2D] hover:bg-gray-50/80 hover:pl-5 transition-all duration-200">{child.label}</Link>
                       ))}
                     </div>
                   )}
@@ -85,23 +66,16 @@ export function PublicHeader() {
               ))}
             </nav>
 
-            <Link
-              href="/apply"
-              className="ml-4 px-6 py-2.5 text-[12px] font-body font-semibold tracking-[0.15em] uppercase rounded-full transition-all duration-300 btn-magnetic"
-              style={{ backgroundColor: '#2C3E2D', color: '#FFFFFF' }}
-              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#C9B97A'; }}
-              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#2C3E2D'; }}
-            >
-              Application
+            {/* ITEM 1: Login button */}
+            <Link href="/auth/login" className="ml-2 px-4 py-2 text-[12px] font-body font-semibold tracking-[0.1em] uppercase rounded-full transition-all duration-300 border border-[#2C3E2D]/20 text-[#2C3E2D] hover:bg-[#2C3E2D]/5 flex items-center gap-1.5">
+              <LogIn className="w-3.5 h-3.5" /> Login
             </Link>
+
+            <Link href="/apply" className="ml-2 px-6 py-2.5 text-[12px] font-body font-semibold tracking-[0.15em] uppercase rounded-full transition-all duration-300 btn-magnetic" style={{ backgroundColor: '#2C3E2D', color: '#FFFFFF' }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#C9B97A'; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#2C3E2D'; }}>Application</Link>
           </div>
 
           {/* Mobile toggle */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden p-2 text-[#2C3E2D]"
-            aria-label="Toggle navigation"
-          >
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 text-[#2C3E2D]" aria-label="Toggle navigation">
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -117,7 +91,8 @@ export function PublicHeader() {
                 {item.children?.map((child) => (<Link key={child.href} href={child.href} className="block py-2 pl-4 text-sm font-body text-gray-400 hover:text-[#2C3E2D] transition-colors" onClick={() => setMobileOpen(false)}>{child.label}</Link>))}
               </div>
             ))}
-            <div className="pt-4">
+            <div className="pt-4 space-y-2">
+              <Link href="/auth/login" className="block w-full text-center py-3 rounded-full text-sm font-body font-semibold uppercase tracking-wider border border-[#2C3E2D]/20 text-[#2C3E2D]" onClick={() => setMobileOpen(false)}>Login</Link>
               <Link href="/apply" className="block w-full text-center py-3 rounded-full text-sm font-body font-semibold uppercase tracking-wider text-white" style={{ backgroundColor: '#2C3E2D' }} onClick={() => setMobileOpen(false)}>Application</Link>
             </div>
           </nav>
