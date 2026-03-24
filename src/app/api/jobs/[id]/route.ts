@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { syncJobToGhl } from '@/lib/ghl/job-sync';
 import { getFieldsConfig } from '@/lib/ghl/get-fields-config';
+import { syncJobAssociationsToGhl } from '@/lib/ghl/association-sync';
 
 function cleanValue(val: any, fieldName: string): any {
   const dateFields = ['closing_date', 'posted_date'];
@@ -47,6 +48,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     ghlSynced = syncResult.success;
     if (ghlSynced && syncResult.ghlRecordId) {
       await supabase.from('lf_jobs').update({ ghl_record_id: syncResult.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', id);
+      const employerId = job.employer_id || job.created_by;
+      if (employerId) {
+        const { data: employer } = await supabase.from('lf_profiles').select('id, full_name, email, kleegr_contact_id, company_name').eq('id', employerId).single();
+        if (employer) await syncJobAssociationsToGhl({ ...job, ghl_record_id: syncResult.ghlRecordId }, employer);
+      }
     }
   }
   return NextResponse.json({ job, ghlSynced });
