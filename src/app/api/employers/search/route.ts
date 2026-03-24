@@ -8,34 +8,49 @@ function ghlHeaders() {
   return { 'Authorization': `Bearer ${ghlConfig.token}`, 'Content-Type': 'application/json', 'Version': '2021-07-28' };
 }
 
+async function searchGhlContacts(query: string): Promise<any[]> {
+  if (!isGhlConfigured()) return [];
+  try {
+    // GHL v2 contacts list endpoint with query parameter for search
+    const params = new URLSearchParams({
+      locationId: ghlConfig.locationId,
+      limit: '20',
+    });
+    if (query) params.set('query', query);
+
+    const res = await fetch(`${BASE}/contacts/?${params}`, { headers: ghlHeaders() });
+    if (!res.ok) {
+      console.error('GHL contacts search failed:', res.status, await res.text().catch(() => ''));
+      return [];
+    }
+    const data = await res.json();
+    return data?.contacts || [];
+  } catch (e) {
+    console.error('GHL contacts search error:', e);
+    return [];
+  }
+}
+
 // GET /api/employers/search?q=sunshine
-// Returns existing employers from:
-//   1. lf_applications where application_type = 'employer'
-//   2. lf_profiles where portal_type = 'employer'
-//   3. GHL contacts (searches all contacts by name/company/email)
+// Searches: portal applications + profiles + ALL GHL contacts
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabase();
   const q = req.nextUrl.searchParams.get('q') || '';
-
   const seen = new Map<string, any>();
 
-  // 1. Search employer applications in portal
+  // 1. Portal employer applications
   let appQuery = supabase.from('lf_applications')
     .select('id, applicant_name, applicant_email, applicant_phone, employer_company, business_type_employer, business_website, ghl_contact_id, address, county')
     .eq('application_type', 'employer')
     .order('created_at', { ascending: false })
     .limit(20);
-
-  if (q.length > 0) {
-    appQuery = appQuery.or(`employer_company.ilike.%${q}%,applicant_name.ilike.%${q}%,applicant_email.ilike.%${q}%`);
-  }
+  if (q.length > 0) appQuery = appQuery.or(`employer_company.ilike.%${q}%,applicant_name.ilike.%${q}%,applicant_email.ilike.%${q}%`);
 
   const { data: apps } = await appQuery;
   for (const a of (apps || [])) {
     const key = (a.employer_company || a.applicant_name || '').toLowerCase().trim();
     if (!key) continue;
-    const existing = seen.get(key);
-    if (!existing || (!existing.ghl_contact_id && a.ghl_contact_id)) {
+    if (!seen.has(key) || (!seen.get(key).ghl_contact_id && a.ghl_contact_id)) {
       seen.set(key, {
         id: a.id, source: 'portal',
         company_name: a.employer_company || a.applicant_name,
@@ -46,17 +61,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2. Search employer profiles in portal
-  let profileQuery = supabase.from('lf_profiles')
+  // 2. Portal employer profiles
+  let profQuery = supabase.from('lf_profiles')
     .select('id, full_name, email, phone, company_name, kleegr_contact_id, address, county')
-    .eq('portal_type', 'employer')
-    .limit(10);
+    .eq('portal_type', 'employer').limit(10);
+  if (q.length > 0) profQuery = profQuery.or(`company_name.ilike.%${q}%,full_name.ilike.%${q}%,email.ilike.%${q}%`);
 
-  if (q.length > 0) {
-    profileQuery = profileQuery.or(`company_name.ilike.%${q}%,full_name.ilike.%${q}%,email.ilike.%${q}%`);
-  }
-
-  const { data: profiles } = await profileQuery;
+  const { data: profiles } = await profQuery;
   for (const p of (profiles || [])) {
     const key = (p.company_name || p.full_name || '').toLowerCase().trim();
     if (!key || seen.has(key)) continue;
@@ -68,84 +79,41 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 3. Search GHL contacts directly (all contacts, not just portal ones)
-  if (isGhlConfigured() && q.length >= 1) {
-    try {
-      const ghlRes = await fetch(`${BASE}/contacts/search`, {
-        method: 'POST',
-        headers: ghlHeaders(),
-        body: JSON.stringify({
-          locationId: ghlConfig.locationId,
-          query: q,
-          limit: 20,
-        }),
-      });
-      const ghlData = await ghlRes.json();
-      const contacts = ghlData?.contacts || ghlData?.data || [];
+  // 3. GHL contacts - search ALL contacts in the location
+  const ghlContacts = await searchGhlContacts(q);
+  for (const c of ghlContacts) {
+    const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || '';
+    const company = c.companyName || c.company || '';
+    const displayName = company || name;
+    const key = displayName.toLowerCase().trim();
+    if (!key) continue;
 
-      for (const c of contacts) {
-        const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || '';
-        const company = c.companyName || c.company || '';
-        const displayName = company || name;
-        const key = displayName.toLowerCase().trim();
-        if (!key || seen.has(key)) continue;
-
-        seen.set(key, {
-          id: c.id, source: 'ghl',
-          company_name: company || name,
-          contact_name: name,
-          email: c.email || '',
-          phone: c.phone || '',
-          address: c.address1 || '',
-          county: '',
-          ghl_contact_id: c.id,
-          tags: c.tags || [],
-        });
-      }
-    } catch (e) {
-      console.error('GHL contact search failed:', e);
+    // If already in portal results, add the GHL ID if missing
+    if (seen.has(key)) {
+      const existing = seen.get(key);
+      if (!existing.ghl_contact_id) existing.ghl_contact_id = c.id;
+      continue;
     }
+
+    seen.set(key, {
+      id: c.id, source: 'ghl',
+      company_name: displayName,
+      contact_name: name,
+      email: c.email || '',
+      phone: c.phone || '',
+      address: c.address1 || '',
+      county: '',
+      ghl_contact_id: c.id,
+      tags: c.tags || [],
+    });
   }
 
-  // Also load all GHL contacts if no query (show recent)
-  if (isGhlConfigured() && q.length === 0) {
-    try {
-      const ghlRes = await fetch(`${BASE}/contacts/?locationId=${ghlConfig.locationId}&limit=20&sortBy=dateAdded&sortOrder=desc`, {
-        headers: ghlHeaders(),
-      });
-      const ghlData = await ghlRes.json();
-      const contacts = ghlData?.contacts || ghlData?.data || [];
-
-      for (const c of contacts) {
-        const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || '';
-        const company = c.companyName || c.company || '';
-        const displayName = company || name;
-        const key = displayName.toLowerCase().trim();
-        if (!key || seen.has(key)) continue;
-
-        seen.set(key, {
-          id: c.id, source: 'ghl',
-          company_name: company || name,
-          contact_name: name,
-          email: c.email || '',
-          phone: c.phone || '',
-          address: c.address1 || '',
-          county: '',
-          ghl_contact_id: c.id,
-          tags: c.tags || [],
-        });
-      }
-    } catch (e) {
-      console.error('GHL contacts list failed:', e);
-    }
-  }
-
-  // Sort: portal results first, then GHL-only results
+  // Sort: portal first, then GHL
   const results = Array.from(seen.values()).sort((a, b) => {
-    if (a.source === 'portal' && b.source === 'ghl') return -1;
-    if (a.source === 'ghl' && b.source === 'portal') return 1;
+    if (a.source === 'portal' && b.source !== 'portal') return -1;
+    if (a.source !== 'portal' && b.source === 'portal') return 1;
     return 0;
   });
 
-  return NextResponse.json({ employers: results });
+  return NextResponse.json({ employers: results, ghl_count: ghlContacts.length });
 }
