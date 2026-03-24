@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
-// ITEMS 9,19,20: Applications API with CRUD
 export async function GET() {
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.from('lf_applications').select('*').order('created_at', { ascending: false });
@@ -19,9 +18,11 @@ export async function POST(req: NextRequest) {
     applicant_name: body.applicant_name || null,
     applicant_email: body.applicant_email || null,
     applicant_phone: body.applicant_phone || null,
+    address: body.address || null,
+    application_type: body.application_type || 'employee',
     cover_letter: body.cover_letter || null,
     notes: body.notes || null,
-    status: body.status || 'new',
+    status: body.status || 'submitted',
     job_id: body.job_id || null,
   };
   const { data, error } = await supabase.from('lf_applications').insert(insertData).select().single();
