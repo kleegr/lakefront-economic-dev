@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown, Upload, FileText, DollarSign } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, ChevronRight, Clock, Mail, Phone, Plus, X, Pencil, Trash2, MapPin, Briefcase, ChevronDown, Upload, FileText, DollarSign, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllFields, GROUP_LABELS, type EmployeeFieldConfig } from '@/lib/ghl/employee-fields';
 import { EMPLOYER_FIELDS, EMPLOYER_GROUP_LABELS, type EmployerFieldConfig } from '@/lib/ghl/employer-fields';
@@ -39,9 +39,21 @@ export default function PortalApplicationsPage() {
   const [saving, setSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ preferences: true, experience: true, application: true, admin: true, business: true, employment: true });
   const [uploading, setUploading] = useState(false);
+  const [syncActive, setSyncActive] = useState(false);
 
-  useEffect(() => { load(); }, []);
-  async function load() { const res = await fetch('/api/applications?admin=true'); const data = await res.json(); setApps(data.applications || []); setLoading(false); }
+  const load = useCallback(async () => { const res = await fetch('/api/applications?admin=true'); const data = await res.json(); setApps(data.applications || []); setLoading(false); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Live auto-refresh every 5 seconds to pick up Kleegr webhook changes
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      setSyncActive(true);
+      await load();
+      setSyncActive(false);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
+
   const filtered = apps.filter(a => { if (search) { const q = search.toLowerCase(); if (!(a.applicant_name || '').toLowerCase().includes(q) && !(a.applicant_email || '').toLowerCase().includes(q)) return false; } if (statusFilter && a.status !== statusFilter) return false; if (typeFilter && a.application_type !== typeFilter) return false; return true; });
   const selected = selectedId ? apps.find(a => a.id === selectedId) : null;
 
@@ -84,7 +96,7 @@ export default function PortalApplicationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between"><div><h1 className="font-display text-2xl font-bold text-brand-forest">Applications</h1><p className="text-sm font-body text-gray-400 mt-1">{apps.length} total</p></div><button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Application</button></div>
+      <div className="flex items-center justify-between"><div><h1 className="font-display text-2xl font-bold text-brand-forest">Applications</h1><p className="text-sm font-body text-gray-400 mt-1">{apps.length} total</p></div><div className="flex items-center gap-2"><span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-[10px] font-body font-semibold"><Zap className={`w-3 h-3 ${syncActive ? 'animate-pulse' : ''}`} /> Live Sync ON</span><button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Application</button></div></div>
       <div className="flex gap-3 flex-wrap"><div className="flex-1 relative min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div><select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Types</option>{APP_TYPES.map(t => <option key={t} value={t}>{fmt(t)}</option>)}</select><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-body"><option value="">All Status</option>{STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}</select></div>
 
       <div className="grid lg:grid-cols-5 gap-6">
