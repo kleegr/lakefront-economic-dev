@@ -238,31 +238,62 @@ export async function processGhlWebhook(body: any, supabase: any): Promise<{ act
   return { action: 'passthrough' };
 }
 
+// GHL uses a 2-step process for associations:
+// 1. Get the association definition between contact and custom_objects.job_openings
+// 2. Create a relation linking specific records
+
+let _associationKey: string | null = null;
+
+async function getContactJobAssociationKey(): Promise<string | null> {
+  if (_associationKey) return _associationKey;
+  if (!isGhlConfigured()) return null;
+  const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
+  try {
+    const res = await fetch(`${BASE}/associations/?locationId=${ghlConfig.locationId}`, { headers: h() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const associations = data?.associations || data?.data || [];
+    for (const a of associations) {
+      const first = a.firstObjectKey || '';
+      const second = a.secondObjectKey || '';
+      if ((first === 'contact' && second === sk) || (first === sk && second === 'contact') ||
+          (first === 'contact' && second.includes('job_openings')) || (first.includes('job_openings') && second === 'contact')) {
+        _associationKey = a.key || a.id;
+        return _associationKey;
+      }
+    }
+    return null;
+  } catch (e) { console.error('Failed to get associations:', e); return null; }
+}
+
 async function associateContactToJob(jobGhlRecordId: string, contactGhlId: string): Promise<{ ok: boolean; error?: string }> {
   if (!isGhlConfigured() || !jobGhlRecordId || !contactGhlId) return { ok: false, error: 'Missing config or IDs' };
-  const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
-  // Strip "custom_objects." prefix for association endpoint - GHL uses just the object key
-  const objectKey = sk.replace('custom_objects.', '');
-  const body = { locationId: ghlConfig.locationId, associations: [{ objectKey: 'contact', recordId: contactGhlId }] };
 
-  // Try multiple URL formats since GHL API is inconsistent
-  const urls = [
-    `${BASE}/objects/${objectKey}/records/${jobGhlRecordId}/associations`,
-    `${BASE}/objects/${sk}/records/${jobGhlRecordId}/associations`,
-    `${BASE}/custom-objects/${objectKey}/records/${jobGhlRecordId}/associations`,
-  ];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { method: 'POST', headers: h(), body: JSON.stringify(body) });
-      const responseText = await res.text().catch(() => '');
-      if (res.ok) return { ok: true };
-      if (res.status === 404) continue;
-      return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 200)} | URL: ${url}` };
-    } catch (e: any) { continue; }
+  const assocKey = await getContactJobAssociationKey();
+  if (!assocKey) {
+    return { ok: false, error: 'No association defined between contact and job_openings in Kleegr. Create one in Settings > Objects > Job Openings > Associations.' };
   }
 
-  return { ok: false, error: `All URL formats failed for association. Tried: ${urls.join(' | ')}` };
+  const sk = ghlConfig.customObjects.jobOpenings || 'custom_objects.job_openings';
+  const body = {
+    locationId: ghlConfig.locationId,
+    associationKey: assocKey,
+    firstObjectRecordId: contactGhlId,
+    firstObjectKey: 'contact',
+    secondObjectRecordId: jobGhlRecordId,
+    secondObjectKey: sk,
+  };
+
+  try {
+    const res = await fetch(`${BASE}/associations/relations`, {
+      method: 'POST', headers: h(), body: JSON.stringify(body),
+    });
+    const responseText = await res.text().catch(() => '');
+    if (res.ok) return { ok: true };
+    return { ok: false, error: `HTTP ${res.status}: ${responseText.substring(0, 300)} | assocKey: ${assocKey}` };
+  } catch (e: any) {
+    return { ok: false, error: `Exception: ${e?.message || String(e)}` };
+  }
 }
 
 async function findContactByEmail(email: string): Promise<string | null> {
