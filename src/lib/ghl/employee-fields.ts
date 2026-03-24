@@ -1,19 +1,11 @@
-// ============================================================
-// EMPLOYEE APPLICATION FIELDS — Single source of truth
-// Maps: Supabase column ↔ GHL contact custom field ↔ Portal form
-// ============================================================
-// To add a new field:
-//   1. Add it here
-//   2. Add the column in Supabase (migration)
-//   3. Add the custom field in GHL with matching fieldKey
-//   4. That's it — form + 2-way sync auto-update
-// ============================================================
+// EMPLOYEE APPLICATION FIELDS - Single source of truth
+// Maps: Supabase column <-> GHL contact custom field <-> Portal form
 
 export interface EmployeeFieldConfig {
   key: string;
   ghlKey: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multiselect';
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multiselect' | 'file';
   placeholder?: string;
   required?: boolean;
   colSpan?: 1 | 2;
@@ -33,8 +25,8 @@ export const EMPLOYEE_FIELDS: EmployeeFieldConfig[] = [
   { key: 'skills_qualifications', ghlKey: 'contact.skills_qualifications', label: 'Skills & Qualifications', type: 'textarea', colSpan: 2, placeholder: 'List your key skills, certifications, and qualifications...', group: 'experience' },
   { key: 'skills_summary', ghlKey: 'contact.skills_summary', label: 'Skills Summary', type: 'textarea', colSpan: 2, placeholder: 'Brief summary of your top skills...', group: 'experience' },
   { key: 'work_history_summary', ghlKey: 'contact.work_history_summary', label: 'Work History Summary', type: 'textarea', colSpan: 2, placeholder: 'Summarize your work history...', group: 'experience' },
-  { key: 'cover_letter', ghlKey: 'contact.cover_letter', label: 'Cover Letter / Why are you interested?', type: 'textarea', colSpan: 2, placeholder: 'Tell us why you\'re interested in this position...', group: 'application' },
-  { key: 'resume_url', ghlKey: 'contact.resume_file', label: 'Resume URL', type: 'text', placeholder: 'Link to your resume (Google Drive, Dropbox, etc.)', group: 'application' },
+  { key: 'cover_letter', ghlKey: 'contact.cover_letter', label: 'Cover Letter / Why are you interested?', type: 'textarea', colSpan: 2, placeholder: 'Tell us why you are interested in this position...', group: 'application' },
+  { key: 'resume_url', ghlKey: 'contact.resume_file', label: 'Resume', type: 'file', placeholder: 'Upload your resume (PDF, DOC, DOCX)', group: 'application' },
   { key: 'priority_score', ghlKey: 'contact.priority_score', label: 'Priority Score', type: 'select', group: 'admin', options: ['High', 'Medium', 'Low'] },
 ];
 
