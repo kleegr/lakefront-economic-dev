@@ -31,6 +31,39 @@ export interface JobFieldConfig {
 }
 
 // ============================================================
+// JOB OPENING STATUS — constants for use across the app
+// ============================================================
+export const JOB_OPENING_STATUSES = ['open', 'hired', 'reserved', 'pending', 'coming_soon'] as const;
+export type JobOpeningStatus = typeof JOB_OPENING_STATUSES[number];
+
+// Statuses where the Apply button should be active
+export const APPLY_ALLOWED_STATUSES: JobOpeningStatus[] = ['open', 'reserved'];
+
+// Human-readable labels
+export const JOB_STATUS_LABELS: Record<JobOpeningStatus, string> = {
+  open: 'Open',
+  hired: 'Hired',
+  reserved: 'Reserved',
+  pending: 'Pending',
+  coming_soon: 'Coming Soon',
+};
+
+// Helper text shown under certain statuses
+export const JOB_STATUS_HELPER: Partial<Record<JobOpeningStatus, string>> = {
+  reserved: 'Accepting backup applications',
+  pending: 'Applications temporarily closed',
+};
+
+// Badge color classes (Tailwind)
+export const JOB_STATUS_COLORS: Record<JobOpeningStatus, { bg: string; text: string }> = {
+  open: { bg: 'bg-green-50', text: 'text-green-700' },
+  hired: { bg: 'bg-gray-100', text: 'text-gray-500' },
+  reserved: { bg: 'bg-amber-50', text: 'text-amber-700' },
+  pending: { bg: 'bg-blue-50', text: 'text-blue-600' },
+  coming_soon: { bg: 'bg-purple-50', text: 'text-purple-600' },
+};
+
+// ============================================================
 // ALL JOB FIELDS
 // ============================================================
 export const JOB_FIELDS: JobFieldConfig[] = [
@@ -100,6 +133,17 @@ export const JOB_FIELDS: JobFieldConfig[] = [
       { value: 'commission', ghlLabel: 'Commission' },
       { value: 'base_commission', ghlLabel: 'Base + Commission' },
       { value: 'other', ghlLabel: 'Other' },
+    ],
+  },
+  {
+    key: 'job_opening_status', ghlKey: 'job_opening_status',
+    label: 'Job Opening Status', type: 'dropdown', group: 'classification',
+    options: [
+      { value: 'open', ghlLabel: 'Open' },
+      { value: 'hired', ghlLabel: 'Hired' },
+      { value: 'reserved', ghlLabel: 'Reserved' },
+      { value: 'pending', ghlLabel: 'Pending' },
+      { value: 'coming_soon', ghlLabel: 'Coming Soon' },
     ],
   },
 
