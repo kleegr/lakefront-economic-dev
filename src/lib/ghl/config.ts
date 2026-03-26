@@ -18,6 +18,8 @@ export const ghlConfig = {
   customObjects: {
     jobOpenings: process.env.GHL_CO_JOBS || process.env.KLEEGR_CO_JOBS || '',
     spaceInventory: process.env.GHL_CO_SPACES || process.env.KLEEGR_CO_SPACES || '',
+    businessOpportunities: process.env.GHL_CO_BUSINESS_OPPORTUNITIES || '',
+    directory: process.env.GHL_CO_DIRECTORY || '',
   },
 };
 
