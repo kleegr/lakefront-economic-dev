@@ -67,7 +67,7 @@ export const CATEGORY_OPTIONS = [
 ];
 
 // ============================================================
-// ALL FIELDS
+// ALL FIELDS — GHL keys match exactly what was created in GHL
 // ============================================================
 export const BIZ_OPP_FIELDS: BizOppFieldConfig[] = [
   // --- Core ---
@@ -89,7 +89,7 @@ export const BIZ_OPP_FIELDS: BizOppFieldConfig[] = [
   { key: 'estimated_monthly_operating_cost', ghlKey: 'monthly_operating_cost', label: 'Est. Monthly Operating Cost', type: 'text', placeholder: 'e.g. $15,000 - $25,000', group: 'financials' },
   { key: 'estimated_monthly_revenue', ghlKey: 'monthly_revenue', label: 'Est. Monthly Revenue', type: 'text', placeholder: 'e.g. $30,000 - $60,000', group: 'financials' },
   { key: 'estimated_profit_potential', ghlKey: 'profit_potential', label: 'Est. Profit Potential', type: 'text', placeholder: 'e.g. $10,000 - $25,000/mo', group: 'financials' },
-  { key: 'break_even_timeline', ghlKey: 'break_even_timeline', label: 'Break-Even Timeline', type: 'text', placeholder: 'e.g. 12-18 months', group: 'financials' },
+  { key: 'break_even_timeline', ghlKey: 'breakeven_timeline', label: 'Break-Even Timeline', type: 'text', placeholder: 'e.g. 12-18 months', group: 'financials' },
   { key: 'funding_options', ghlKey: 'funding_options', label: 'Funding Options', type: 'text', placeholder: 'SBA, private, etc.', group: 'financials' },
   { key: 'financing_available', ghlKey: 'financing_available', label: 'Financing Available', type: 'boolean', group: 'financials' },
 
@@ -123,7 +123,7 @@ export const BIZ_OPP_FIELDS: BizOppFieldConfig[] = [
   { key: 'equipment_needed', ghlKey: 'equipment_needed', label: 'Equipment Needed', type: 'textarea', colSpan: 2, group: 'resources' },
   { key: 'tools_needed', ghlKey: '', label: 'Tools Needed', type: 'textarea', colSpan: 2, group: 'resources' },
   { key: 'inventory_needed', ghlKey: '', label: 'Inventory Needed', type: 'textarea', colSpan: 2, group: 'resources' },
-  { key: 'technology_software_needed', ghlKey: 'tech_software_needed', label: 'Technology/Software Needed', type: 'textarea', colSpan: 2, group: 'resources' },
+  { key: 'technology_software_needed', ghlKey: 'techsoftware_needed', label: 'Technology/Software Needed', type: 'textarea', colSpan: 2, group: 'resources' },
 
   // --- Location ---
   { key: 'location_type', ghlKey: 'location_type', label: 'Location Type', type: 'dropdown', group: 'location', options: [
@@ -149,13 +149,12 @@ export const BIZ_OPP_FIELDS: BizOppFieldConfig[] = [
     { value: 'Low', ghlLabel: 'Low' }, { value: 'Medium', ghlLabel: 'Medium' }, { value: 'High', ghlLabel: 'High' },
   ]},
 
-  // --- Publishing ---
+  // --- Publishing (no assigned_to — not in GHL) ---
   { key: 'status', ghlKey: 'opportunity_status', label: 'Status', type: 'dropdown', required: true, group: 'publishing', options: [
     { value: 'available', ghlLabel: 'Available' }, { value: 'taken', ghlLabel: 'Taken' },
     { value: 'coming_soon', ghlLabel: 'Coming Soon' }, { value: 'under_review', ghlLabel: 'Under Review' },
     { value: 'closed', ghlLabel: 'Closed' },
   ]},
-  { key: 'assigned_to', ghlKey: 'assigned_to', label: 'Assigned To', type: 'text', placeholder: 'Business name if taken', group: 'publishing' },
   { key: 'featured', ghlKey: 'featured', label: 'Featured', type: 'boolean', group: 'publishing' },
   { key: 'application_required', ghlKey: 'application_required', label: 'Application Required', type: 'boolean', group: 'publishing' },
 
