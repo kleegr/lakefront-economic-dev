@@ -2,7 +2,8 @@
 // DIRECTORY FIELDS CONFIG — Single source of truth
 // ============================================================
 // Unified business + service provider directory
-// Same pattern as job-fields-config.ts
+// GHL Custom Object: "Business Directories"
+// GHL keys match exactly what was created in GHL
 // ============================================================
 
 export type FieldType = 'text' | 'textarea' | 'dropdown' | 'number' | 'date' | 'boolean' | 'hidden';
@@ -65,7 +66,8 @@ export const DIRECTORY_CATEGORIES = [
 ];
 
 // ============================================================
-// ALL FIELDS
+// ALL FIELDS — GHL keys match exactly what was created in GHL
+// GHL Custom Object name: business_directories
 // ============================================================
 export const DIRECTORY_FIELDS: DirectoryFieldConfig[] = [
   // --- Core ---
@@ -105,7 +107,7 @@ export const DIRECTORY_FIELDS: DirectoryFieldConfig[] = [
   // --- Details ---
   { key: 'hours_of_operation', ghlKey: 'hours_of_operation', label: 'Hours of Operation', type: 'textarea', colSpan: 2, group: 'details' },
   { key: 'languages_spoken', ghlKey: 'languages_spoken', label: 'Languages Spoken', type: 'text', placeholder: 'English, Spanish, Hebrew', group: 'details' },
-  { key: 'pricing_range', ghlKey: 'pricing_range', label: 'Pricing Range', type: 'dropdown', group: 'details', options: [
+  { key: 'pricing_range', ghlKey: 'amount', label: 'Pricing Range', type: 'dropdown', group: 'details', options: [
     { value: '$', ghlLabel: '$' }, { value: '$$', ghlLabel: '$$' },
     { value: '$$$', ghlLabel: '$$$' }, { value: '$$$$', ghlLabel: '$$$$' },
   ]},
@@ -150,7 +152,7 @@ export const GROUP_LABELS: Record<string, string> = {
   publishing: 'Status & Visibility',
 };
 
-// GHL Mapping
+// GHL Mapping — object name is business_directories
 export function directoryToGhlProperties(entry: Record<string, any>): Record<string, any> {
   const props: Record<string, any> = {};
   for (const field of DIRECTORY_FIELDS) {
