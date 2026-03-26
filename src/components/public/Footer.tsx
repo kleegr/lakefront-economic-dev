@@ -12,7 +12,7 @@ export function PublicFooter() {
           <div>
             <h4 className="font-display text-sm font-semibold mb-5 text-brand-gold uppercase tracking-wider">Quick Links</h4>
             <ul className="space-y-2.5">
-              {[{label:'About',href:'/about'},{label:'Jobs Board',href:'/jobs'},{label:'Business Directory',href:'/businesses'},{label:'Commercial Spaces',href:'/commercial'},{label:'Investors',href:'/investors'},{label:'Service Providers',href:'/services'}].map(link => (
+              {[{label:'About',href:'/about'},{label:'Jobs Board',href:'/jobs'},{label:'Business Opportunities',href:'/businesses'},{label:'Business Directory',href:'/directory'},{label:'Commercial Spaces',href:'/commercial'},{label:'Investors',href:'/investors'}].map(link => (
                 <li key={link.href}><Link href={link.href} className="text-sm text-white/40 hover:text-brand-gold transition-colors font-body">{link.label}</Link></li>
               ))}
             </ul>
