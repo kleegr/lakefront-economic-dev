@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug, Monitor, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileText, Building2, Wrench, Warehouse, Users, Settings, Bell, Menu, Globe, LogOut, Shield, Tag, ClipboardCheck, ScrollText, MessageSquare, Store, Key, Eye, X, Plug, Monitor, RefreshCw, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem { label: string; href: string; icon: any; badge?: number; }
@@ -50,9 +50,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       items: [
         { label: 'Jobs', href: '/portal/jobs', icon: Briefcase },
         { label: 'Applications', href: '/portal/applications', icon: FileText },
-        { label: 'Businesses', href: '/portal/businesses', icon: Building2 },
+        { label: 'Business Opportunities', href: '/portal/businesses', icon: Building2 },
         { label: 'Business Apps', href: '/portal/business-apps', icon: Store },
-        { label: 'Services', href: '/portal/services', icon: Wrench },
+        { label: 'Directory', href: '/portal/services', icon: BookOpen },
         { label: 'Spaces', href: '/portal/spaces', icon: Warehouse },
       ],
     },
@@ -73,7 +73,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     },
   ];
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-portal-bg"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>;
+  if (loading) return (<div className="min-h-screen flex items-center justify-center bg-portal-bg"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>);
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const isActive = pathname === item.href || (item.href !== '/portal/dashboard' && pathname.startsWith(item.href));
