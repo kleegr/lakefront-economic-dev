@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { logBizOppAction } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
@@ -45,5 +46,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase.from('lf_business_opportunities').insert(oppData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logBizOppAction(user.id, 'biz_opp_created', data.id, { title: data.title, category: data.business_category, status: data.status });
+
   return NextResponse.json({ item: data });
 }
