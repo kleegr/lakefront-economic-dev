@@ -8,8 +8,13 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const directClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const { data: adminProfile } = await directClient.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
+  // Use service role to bypass RLS for admin operations
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: adminProfile } = await serviceClient.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
   if (!adminProfile || !['super_admin', 'admin'].includes(adminProfile.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
   const tokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
   // Create invitation
-  const { error: invErr } = await directClient.from('lf_invitations').insert({
+  const { error: invErr } = await serviceClient.from('lf_invitations').insert({
     email: email.toLowerCase().trim(), role, portal_type,
     full_name: full_name || '', token, token_expires_at: tokenExpiresAt,
     permissions: permissions || [], invited_by: user.id, status: 'pending',
@@ -31,13 +36,13 @@ export async function POST(request: NextRequest) {
   if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
 
   // Also add to allowed_emails
-  await directClient.from('lf_allowed_emails').upsert({
+  await serviceClient.from('lf_allowed_emails').upsert({
     email: email.toLowerCase().trim(), role, portal_type,
     full_name: full_name || '', invited_by: user.id, is_active: true,
   }, { onConflict: 'email' });
 
   // Audit log
-  await directClient.from('lf_audit_log').insert({
+  await serviceClient.from('lf_audit_log').insert({
     user_id: user.id, action: 'invitation_sent', entity_type: 'invitation',
     details: { email, role, portal_type, permissions: permissions || [] },
   });
@@ -52,12 +57,17 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const directClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const { data: adminProfile } = await directClient.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
+  // Use service role to bypass RLS for admin operations
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: adminProfile } = await serviceClient.from('lf_profiles').select('role').eq('id', user.id).maybeSingle();
   if (!adminProfile || !['super_admin', 'admin'].includes(adminProfile.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data } = await directClient.from('lf_invitations').select('*').order('created_at', { ascending: false });
+  const { data } = await serviceClient.from('lf_invitations').select('*').order('created_at', { ascending: false });
   return NextResponse.json({ invitations: data || [] });
 }
