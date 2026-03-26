@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { logDirectoryAction } from '@/lib/audit';
+import { syncDirectoryToGhl } from '@/lib/ghl/directory-sync';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
@@ -51,7 +52,13 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.from('lf_directory').insert(entryData).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await logDirectoryAction(user.id, 'directory_created', data.id, { business_name: data.business_name, category: data.category, listing_type: data.listing_type });
+  // Sync to GHL
+  const syncResult = await syncDirectoryToGhl(data);
+  if (syncResult.ghlRecordId) {
+    await supabase.from('lf_directory').update({ ghl_record_id: syncResult.ghlRecordId, ghl_synced_at: new Date().toISOString() }).eq('id', data.id);
+  }
 
-  return NextResponse.json({ item: data });
+  await logDirectoryAction(user.id, 'directory_created', data.id, { business_name: data.business_name, category: data.category, ghl_synced: syncResult.success });
+
+  return NextResponse.json({ item: data, ghlSync: syncResult });
 }
