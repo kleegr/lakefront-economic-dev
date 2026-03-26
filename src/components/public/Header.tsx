@@ -17,7 +17,7 @@ const NAV_ITEMS = [
     ],
   },
   { label: 'Spaces', href: '/spaces' },
-  { label: 'Services', href: '/services' },
+  { label: 'Business Opportunities', href: '/businesses' },
   { label: 'Contact', href: '/contact' },
 ];
 
