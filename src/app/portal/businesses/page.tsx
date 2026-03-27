@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Building2, Search, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Building2, Search, X, ChevronDown, ChevronRight, Zap, RefreshCw } from 'lucide-react';
 import {
   BIZ_OPP_FIELDS, BIZ_OPP_STATUS_LABELS, BIZ_OPP_STATUS_COLORS,
   getFieldsByGroup, GROUP_LABELS, type BizOppStatus,
@@ -20,13 +20,35 @@ export default function BusinessOpportunitiesPortalPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ core: true, descriptions: true, publishing: true });
   const [form, setForm] = useState<Record<string, any>>({ ...emptyForm });
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncActive, setSyncActive] = useState(false);
 
-  useEffect(() => { load(); }, []);
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch('/api/business-opportunities?admin=true');
     const data = await res.json();
     setItems(data.items || []); setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        setSyncActive(true);
+        const res = await fetch('/api/business-opportunities/auto-sync');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pushed > 0) {
+            setSyncMsg(`Synced ${data.pushed} opportunit${data.pushed === 1 ? 'y' : 'ies'} to GHL`);
+            load();
+            setTimeout(() => setSyncMsg(''), 5000);
+          }
+        }
+      } catch { /* silent */ }
+      setSyncActive(false);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   function openNew() {
     setEditing(null);
@@ -67,8 +89,14 @@ export default function BusinessOpportunitiesPortalPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-display text-2xl font-bold text-brand-forest">Business Opportunities</h1><p className="text-sm font-body text-gray-400 mt-1">{items.length} opportunities</p></div>
-        <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Opportunity</button>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-[10px] font-body font-semibold">
+            <Zap className={`w-3 h-3 ${syncActive ? 'animate-pulse' : ''}`} /> Live Sync ON
+          </span>
+          <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Opportunity</button>
+        </div>
       </div>
+      {syncMsg && <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-body flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" />{syncMsg}</div>}
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search opportunities..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div>
       <div className="space-y-3">
         {filtered.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl border"><Building2 className="w-10 h-10 text-gray-200 mx-auto mb-3" /><p className="text-gray-400 font-body">No opportunities found</p></div>) : filtered.map(item => {
@@ -82,8 +110,9 @@ export default function BusinessOpportunitiesPortalPage() {
                     <h3 className="font-display text-base font-semibold text-brand-forest truncate">{item.title}</h3>
                     <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase ${sc.bg} ${sc.text}`}>{BIZ_OPP_STATUS_LABELS[st]}</span>
                     {item.priority && <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase bg-blue-50 text-blue-600">{item.priority}</span>}
+                    {item.ghl_synced_at && <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold bg-blue-50 text-blue-600">Synced</span>}
                   </div>
-                  <p className="text-xs text-gray-400 font-body truncate">{item.business_category || 'General'}{item.assigned_to ? ` \u00b7 ${item.assigned_to}` : ''}{item.startup_investment_required ? ` \u00b7 ${item.startup_investment_required}` : ''}</p>
+                  <p className="text-xs text-gray-400 font-body truncate">{item.business_category || 'General'}{item.startup_investment_required ? ` \u00b7 ${item.startup_investment_required}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={e => { e.stopPropagation(); openEdit(item); }} className="p-1.5 text-gray-300 hover:text-brand-forest hover:bg-gray-100 rounded-lg"><Pencil className="w-4 h-4" /></button>
@@ -99,6 +128,7 @@ export default function BusinessOpportunitiesPortalPage() {
                   {item.demand_level && <p><strong>Demand:</strong> {item.demand_level}</p>}
                   {item.contact_name && <p><strong>Contact:</strong> {item.contact_name} {item.contact_email ? `(${item.contact_email})` : ''}</p>}
                   {item.city && <p><strong>Location:</strong> {item.city}, {item.state}</p>}
+                  <p><strong>GHL Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
                 </div>
               )}
             </div>

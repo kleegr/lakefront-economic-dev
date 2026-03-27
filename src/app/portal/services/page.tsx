@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, BookOpen, Search, X, ChevronDown, ChevronRight, CheckCircle, Star } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, BookOpen, Search, X, ChevronDown, ChevronRight, CheckCircle, Star, Zap, RefreshCw } from 'lucide-react';
 import {
   DIRECTORY_FIELDS, DIRECTORY_STATUS_LABELS, DIRECTORY_STATUS_COLORS,
   getFieldsByGroup, GROUP_LABELS, type DirectoryStatus,
@@ -20,13 +20,35 @@ export default function DirectoryPortalPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ core: true, descriptions: true, contact: true, publishing: true });
   const [form, setForm] = useState<Record<string, any>>({ ...emptyForm });
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncActive, setSyncActive] = useState(false);
 
-  useEffect(() => { load(); }, []);
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch('/api/directory?admin=true');
     const data = await res.json();
     setItems(data.items || []); setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        setSyncActive(true);
+        const res = await fetch('/api/directory/auto-sync');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pushed > 0) {
+            setSyncMsg(`Synced ${data.pushed} listing${data.pushed === 1 ? '' : 's'} to GHL`);
+            load();
+            setTimeout(() => setSyncMsg(''), 5000);
+          }
+        }
+      } catch { /* silent */ }
+      setSyncActive(false);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   function openNew() {
     setEditing(null);
@@ -67,8 +89,14 @@ export default function DirectoryPortalPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="font-display text-2xl font-bold text-brand-forest">Business Directory</h1><p className="text-sm font-body text-gray-400 mt-1">{items.length} listings</p></div>
-        <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Listing</button>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-[10px] font-body font-semibold">
+            <Zap className={`w-3 h-3 ${syncActive ? 'animate-pulse' : ''}`} /> Live Sync ON
+          </span>
+          <button onClick={openNew} className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-forest text-white rounded-lg text-sm font-body font-semibold hover:bg-brand-forest/90"><Plus className="w-4 h-4" /> Add Listing</button>
+        </div>
       </div>
+      {syncMsg && <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-body flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" />{syncMsg}</div>}
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search directory..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm font-body focus:outline-none focus:border-brand-sage" /></div>
       <div className="space-y-3">
         {filtered.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl border"><BookOpen className="w-10 h-10 text-gray-200 mx-auto mb-3" /><p className="text-gray-400 font-body">No listings found</p></div>) : filtered.map(item => {
@@ -84,6 +112,7 @@ export default function DirectoryPortalPage() {
                     {item.verified && <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />}
                     {item.featured && <Star className="w-3.5 h-3.5 text-amber-400 shrink-0 fill-amber-400" />}
                     <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase bg-gray-100 text-gray-500">{item.listing_type || 'Business'}</span>
+                    {item.ghl_synced_at && <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold bg-blue-50 text-blue-600">Synced</span>}
                   </div>
                   <p className="text-xs text-gray-400 font-body truncate">{item.category || 'General'}{item.phone ? ` \u00b7 ${item.phone}` : ''}{item.email ? ` \u00b7 ${item.email}` : ''}</p>
                 </div>
@@ -101,6 +130,7 @@ export default function DirectoryPortalPage() {
                   {item.address_line_1 && <p><strong>Address:</strong> {item.address_line_1}{item.city ? `, ${item.city}` : ''}{item.state ? ` ${item.state}` : ''}{item.zip_code ? ` ${item.zip_code}` : ''}</p>}
                   {item.services_offered && <p><strong>Services:</strong> {item.services_offered}</p>}
                   {item.hours_of_operation && <p><strong>Hours:</strong> {item.hours_of_operation}</p>}
+                  <p><strong>GHL Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
                 </div>
               )}
             </div>
