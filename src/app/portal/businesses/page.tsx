@@ -5,10 +5,13 @@ import {
   BIZ_OPP_FIELDS, BIZ_OPP_STATUS_LABELS, BIZ_OPP_STATUS_COLORS,
   getFieldsByGroup, GROUP_LABELS, type BizOppStatus,
 } from '@/lib/ghl/business-opportunities-fields-config';
+import ContactPicker from '@/components/portal/ContactPicker';
 
 const fieldGroups = getFieldsByGroup();
 const emptyForm: Record<string, any> = {};
 for (const f of BIZ_OPP_FIELDS) { if (f.type === 'hidden') continue; emptyForm[f.key] = f.type === 'boolean' ? false : f.type === 'number' ? '' : ''; }
+
+const CONTACT_FIELDS = new Set(['contact_name', 'contact_email', 'contact_phone']);
 
 export default function BusinessOpportunitiesPortalPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -83,6 +86,10 @@ export default function BusinessOpportunitiesPortalPage() {
 
   const getStatus = (item: any): BizOppStatus => (item.status || 'available') as BizOppStatus;
 
+  function handleContactSelect(contact: { name: string; email: string; phone: string }) {
+    setForm(prev => ({ ...prev, contact_name: contact.name, contact_email: contact.email, contact_phone: contact.phone }));
+  }
+
   if (loading) return (<div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>);
 
   return (
@@ -155,7 +162,16 @@ export default function BusinessOpportunitiesPortalPage() {
                       {fields.map(field => (
                         <div key={field.key} className={field.colSpan === 2 ? 'sm:col-span-2' : ''}>
                           <label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">{field.label}{field.required ? ' *' : ''}</label>
-                          {field.type === 'dropdown' && field.options ? (
+                          {field.key === 'contact_name' ? (
+                            <ContactPicker
+                              value={form.contact_name || ''}
+                              onChange={val => setField('contact_name', val)}
+                              onSelect={handleContactSelect}
+                              placeholder="Search Kleegr contacts or type new..."
+                            />
+                          ) : CONTACT_FIELDS.has(field.key) ? (
+                            <input type="text" value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} placeholder={field.placeholder} className="input-portal" />
+                          ) : field.type === 'dropdown' && field.options ? (
                             <select value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} required={field.required} className="input-portal">
                               <option value="">Select...</option>
                               {field.options.map(o => <option key={o.value} value={o.value}>{o.ghlLabel}</option>)}

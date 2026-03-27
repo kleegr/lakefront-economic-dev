@@ -5,10 +5,13 @@ import {
   DIRECTORY_FIELDS, DIRECTORY_STATUS_LABELS, DIRECTORY_STATUS_COLORS,
   getFieldsByGroup, GROUP_LABELS, type DirectoryStatus,
 } from '@/lib/ghl/directory-fields-config';
+import ContactPicker from '@/components/portal/ContactPicker';
 
 const fieldGroups = getFieldsByGroup();
 const emptyForm: Record<string, any> = {};
 for (const f of DIRECTORY_FIELDS) { if (f.type === 'hidden') continue; emptyForm[f.key] = f.type === 'boolean' ? false : f.type === 'number' ? '' : ''; }
+
+const CONTACT_FIELDS = new Set(['contact_name', 'contact_title', 'phone', 'email']);
 
 export default function DirectoryPortalPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -82,6 +85,10 @@ export default function DirectoryPortalPage() {
   const filtered = items.filter(i => !search || i.business_name?.toLowerCase().includes(search.toLowerCase()) || i.category?.toLowerCase().includes(search.toLowerCase()) || i.display_name?.toLowerCase().includes(search.toLowerCase()));
 
   const getStatus = (item: any): DirectoryStatus => (item.status || 'active') as DirectoryStatus;
+
+  function handleContactSelect(contact: { name: string; email: string; phone: string }) {
+    setForm(prev => ({ ...prev, contact_name: contact.name, email: contact.email, phone: contact.phone }));
+  }
 
   if (loading) return (<div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-brand-sage border-t-transparent rounded-full" /></div>);
 
@@ -157,7 +164,16 @@ export default function DirectoryPortalPage() {
                       {fields.map(field => (
                         <div key={field.key} className={field.colSpan === 2 ? 'sm:col-span-2' : ''}>
                           <label className="block text-xs font-body font-medium text-gray-500 mb-1 uppercase tracking-wider">{field.label}{field.required ? ' *' : ''}</label>
-                          {field.type === 'dropdown' && field.options ? (
+                          {field.key === 'contact_name' ? (
+                            <ContactPicker
+                              value={form.contact_name || ''}
+                              onChange={val => setField('contact_name', val)}
+                              onSelect={handleContactSelect}
+                              placeholder="Search Kleegr contacts or type new..."
+                            />
+                          ) : CONTACT_FIELDS.has(field.key) ? (
+                            <input type="text" value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} placeholder={field.placeholder} className="input-portal" />
+                          ) : field.type === 'dropdown' && field.options ? (
                             <select value={form[field.key] || ''} onChange={e => setField(field.key, e.target.value)} required={field.required} className="input-portal">
                               <option value="">Select...</option>
                               {field.options.map(o => <option key={o.value} value={o.value}>{o.ghlLabel}</option>)}
