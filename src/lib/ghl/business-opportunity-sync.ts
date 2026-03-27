@@ -1,4 +1,4 @@
-// Business Opportunity Sync — pushes to GHL Custom Object: business_opportunities
+// Business Opportunity Sync — pushes to Kleegr Custom Object: business_opportunities
 import { ghlConfig, isGhlConfigured } from './config';
 import { bizOppToGhlProperties } from './business-opportunities-fields-config';
 
@@ -26,7 +26,7 @@ export async function syncBizOppToGhl(
   opp: Record<string, any>,
   existingGhlId?: string | null
 ): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
-  if (!isGhlConfigured()) return { ghlRecordId: null, success: false, error: 'GHL not configured' };
+  if (!isGhlConfigured()) return { ghlRecordId: null, success: false, error: 'Kleegr not configured' };
   try {
     const props = bizOppToGhlProperties(opp);
     if (existingGhlId) {
@@ -45,7 +45,7 @@ export async function syncBizOppToGhl(
 }
 
 export async function deleteGhlBizOppRecord(recordId: string): Promise<{ success: boolean; error?: string }> {
-  if (!isGhlConfigured()) return { success: false, error: 'GHL not configured' };
+  if (!isGhlConfigured()) return { success: false, error: 'Kleegr not configured' };
   try {
     const res = await fetch(`${BASE_URL}/objects/${SCHEMA_KEY}/records/${recordId}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: getHeaders() });
     if (res.ok) return { success: true };

@@ -39,7 +39,7 @@ export default function BusinessOpportunitiesPortalPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.pushed > 0) {
-            setSyncMsg(`Synced ${data.pushed} opportunit${data.pushed === 1 ? 'y' : 'ies'} to GHL`);
+            setSyncMsg(`Synced ${data.pushed} opportunit${data.pushed === 1 ? 'y' : 'ies'} to Kleegr`);
             load();
             setTimeout(() => setSyncMsg(''), 5000);
           }
@@ -128,7 +128,7 @@ export default function BusinessOpportunitiesPortalPage() {
                   {item.demand_level && <p><strong>Demand:</strong> {item.demand_level}</p>}
                   {item.contact_name && <p><strong>Contact:</strong> {item.contact_name} {item.contact_email ? `(${item.contact_email})` : ''}</p>}
                   {item.city && <p><strong>Location:</strong> {item.city}, {item.state}</p>}
-                  <p><strong>GHL Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
+                  <p><strong>Kleegr Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
                 </div>
               )}
             </div>

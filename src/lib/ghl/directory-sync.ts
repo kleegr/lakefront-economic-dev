@@ -1,4 +1,4 @@
-// Directory Sync — pushes to GHL Custom Object: business_directories
+// Directory Sync — pushes to Kleegr Custom Object: business_directories
 import { ghlConfig, isGhlConfigured } from './config';
 import { directoryToGhlProperties } from './directory-fields-config';
 
@@ -26,7 +26,7 @@ export async function syncDirectoryToGhl(
   entry: Record<string, any>,
   existingGhlId?: string | null
 ): Promise<{ ghlRecordId: string | null; success: boolean; error?: string }> {
-  if (!isGhlConfigured()) return { ghlRecordId: null, success: false, error: 'GHL not configured' };
+  if (!isGhlConfigured()) return { ghlRecordId: null, success: false, error: 'Kleegr not configured' };
   try {
     const props = directoryToGhlProperties(entry);
     if (existingGhlId) {
@@ -45,7 +45,7 @@ export async function syncDirectoryToGhl(
 }
 
 export async function deleteGhlDirectoryRecord(recordId: string): Promise<{ success: boolean; error?: string }> {
-  if (!isGhlConfigured()) return { success: false, error: 'GHL not configured' };
+  if (!isGhlConfigured()) return { success: false, error: 'Kleegr not configured' };
   try {
     const res = await fetch(`${BASE_URL}/objects/${SCHEMA_KEY}/records/${recordId}?locationId=${ghlConfig.locationId}`, { method: 'DELETE', headers: getHeaders() });
     if (res.ok) return { success: true };

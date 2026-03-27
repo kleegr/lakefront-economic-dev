@@ -39,7 +39,7 @@ export default function DirectoryPortalPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.pushed > 0) {
-            setSyncMsg(`Synced ${data.pushed} listing${data.pushed === 1 ? '' : 's'} to GHL`);
+            setSyncMsg(`Synced ${data.pushed} listing${data.pushed === 1 ? '' : 's'} to Kleegr`);
             load();
             setTimeout(() => setSyncMsg(''), 5000);
           }
@@ -130,7 +130,7 @@ export default function DirectoryPortalPage() {
                   {item.address_line_1 && <p><strong>Address:</strong> {item.address_line_1}{item.city ? `, ${item.city}` : ''}{item.state ? ` ${item.state}` : ''}{item.zip_code ? ` ${item.zip_code}` : ''}</p>}
                   {item.services_offered && <p><strong>Services:</strong> {item.services_offered}</p>}
                   {item.hours_of_operation && <p><strong>Hours:</strong> {item.hours_of_operation}</p>}
-                  <p><strong>GHL Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
+                  <p><strong>Kleegr Sync:</strong> <span className={item.ghl_synced_at ? 'text-blue-600 font-semibold' : 'text-gray-400'}>{item.ghl_synced_at ? `Synced ${new Date(item.ghl_synced_at).toLocaleString()}` : 'Not synced'}</span></p>
                 </div>
               )}
             </div>
