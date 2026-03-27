@@ -45,7 +45,8 @@ interface AuditLogEntry {
   target_user_id?: string;
 }
 
-let _serviceClient: ReturnType<typeof createClient> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _serviceClient: any = null;
 
 function getServiceClient() {
   if (!_serviceClient) {
